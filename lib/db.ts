@@ -16,7 +16,12 @@ let _pool: Pool | null = null;
 
 function getPool(): Pool {
   if (!_pool) {
-    _pool = new Pool({ connectionString: requireEnv("DATABASE_URL") });
+    _pool = new Pool({
+      connectionString: requireEnv("DATABASE_URL"),
+      // O pooler do Supabase exige SSL; a CA não é verificável a partir de
+      // funções serverless, então validamos a conexão (não o dado) sem checar a cadeia.
+      ssl: { rejectUnauthorized: false },
+    });
   }
   return _pool;
 }
