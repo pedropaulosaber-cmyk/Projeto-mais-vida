@@ -1,23 +1,68 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { getStripe } from "@/lib/stripe";
+import { requireEnv, getEnv } from "@/lib/env";
+import { rateLimit } from "@/lib/rate-limit";
 
 /*
- * POST /api/checkout — ESQUELETO (Etapa 1).
+ * POST /api/checkout (skill stripe-drive-checkout, Passo 2).
  *
- * Responsabilidade (skill stripe-drive-checkout, Passo 2): criar a Stripe
- * Checkout Session server-side e devolver { url } para o frontend redirecionar.
- * O preço vem SEMPRE de STRIPE_PRICE_ID (nunca hardcoded no client nem em dois
- * lugares). A implementação real (mode: "payment", line_items com o Price,
- * success_url/cancel_url, metadata) entra na etapa de checkout, junto com:
- *   - rate limiting (lib/rate-limit.ts) para conter abuso
- *   - Stripe Radar / fraud-prevention na configuração da conta/checkout
- *
- * Roda no runtime Node (precisa do SDK do Stripe com a secret key).
+ * Cria a Stripe Checkout Session server-side e devolve { url } para o
+ * frontend redirecionar (window.location = url). O preço vem SEMPRE de
+ * STRIPE_PRICE_ID — nunca hardcoded aqui nem no client, para não haver dois
+ * lugares de verdade sobre quanto custa o produto.
  */
 export const runtime = "nodejs";
 
-export async function POST() {
-  return NextResponse.json(
-    { error: "Não implementado — esqueleto (Etapa 1)." },
-    { status: 501 },
-  );
+const bodySchema = z.object({
+  ctaId: z.string().max(60).optional(),
+});
+
+function getClientIp(req: NextRequest): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  return fwd?.split(",")[0]?.trim() || "unknown";
+}
+
+export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const limit = rateLimit(`checkout:${ip}`, 10, 60_000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Muitas tentativas. Tente novamente em instantes." },
+      { status: 429 },
+    );
+  }
+
+  let ctaId: string | undefined;
+  try {
+    const json = await req.json().catch(() => ({}));
+    const parsed = bodySchema.safeParse(json);
+    if (parsed.success) ctaId = parsed.data.ctaId;
+  } catch {
+    // corpo ausente/malformado é aceitável — ctaId é só metadado opcional
+  }
+
+  const siteUrl = getEnv("NEXT_PUBLIC_SITE_URL") ?? "http://localhost:3000";
+
+  try {
+    const session = await getStripe().checkout.sessions.create({
+      mode: "payment",
+      line_items: [{ price: requireEnv("STRIPE_PRICE_ID"), quantity: 1 }],
+      success_url: `${siteUrl}/obrigado?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: siteUrl,
+      metadata: { produto: "drivebooks-acesso", cta_id: ctaId ?? "" },
+    });
+
+    if (!session.url) {
+      throw new Error("Stripe não retornou uma URL de checkout.");
+    }
+
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    console.error("[checkout] falha ao criar sessão:", err);
+    return NextResponse.json(
+      { error: "Não foi possível iniciar o checkout. Tente novamente." },
+      { status: 502 },
+    );
+  }
 }
