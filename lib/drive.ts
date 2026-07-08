@@ -33,6 +33,15 @@ export function getDriveFolderId(): string {
   return requireEnv("DRIVE_FOLDER_ID");
 }
 
+/**
+ * URL pública da pasta mestre. Mostrar essa URL não é um risco de segurança:
+ * o Drive continua controlando o acesso por PERMISSÃO (não por "quem tem o
+ * link"), então só abre de verdade para quem já recebeu `grantFolderAccess`.
+ */
+export function getDriveFolderUrl(): string {
+  return `https://drive.google.com/drive/folders/${getDriveFolderId()}`;
+}
+
 let _drive: ReturnType<typeof google.drive> | null = null;
 
 function getDrive() {
