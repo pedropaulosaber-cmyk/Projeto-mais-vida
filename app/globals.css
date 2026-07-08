@@ -374,3 +374,18 @@ details[open] .faq-chev{transform:rotate(45deg)}
 .mwrap{max-width:760px;margin:0 auto;background:#fff;min-height:100vh;box-shadow:0 0 60px -20px rgba(0,0,0,.25);position:relative;overflow:hidden}
 .blkcta{max-width:480px;margin-left:auto;margin-right:auto}
 @media (prefers-reduced-motion: reduce){.cta{animation:none!important}[style*="scrollx"]{animation:none!important}}
+
+/* ==========================================================================
+   Alternância Mobile / Desktop (SSR-friendly, sem JS)
+   Os dois markups são renderizados juntos (ver components/LandingClient.tsx);
+   a media query decide qual aparece. Abaixo de 1024px: mobile (DriveBooks
+   original, intacto). A partir de 1024px: desktop. As familias de fonte,
+   .cta, @keyframes scrollx, details/summary e .faq-chev já são globais acima
+   e servem as duas versões — nada foi duplicado.
+   ========================================================================== */
+.dc-mobile{display:block}
+.dc-desktop{display:none}
+@media (min-width:1024px){
+  .dc-mobile{display:none}
+  .dc-desktop{display:block;background:#fff}
+}
