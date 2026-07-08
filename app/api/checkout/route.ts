@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getStripe } from "@/lib/stripe";
 import { requireEnv, getEnv } from "@/lib/env";
 import { rateLimit } from "@/lib/rate-limit";
+import { PRODUCT_METADATA_VALUE } from "@/lib/product";
 
 /*
  * POST /api/checkout (skill stripe-drive-checkout, Passo 2).
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
       line_items: [{ price: requireEnv("STRIPE_PRICE_ID"), quantity: 1 }],
       success_url: `${siteUrl}/obrigado?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: siteUrl,
-      metadata: { produto: "drivebooks-acesso", cta_id: ctaId ?? "" },
+      metadata: { produto: PRODUCT_METADATA_VALUE, cta_id: ctaId ?? "" },
     });
 
     if (!session.url) {
