@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { LANDING_HTML } from "./landingMarkup";
+import { LANDING_HTML_DESKTOP } from "./landingMarkupDesktop";
 
 /*
  * Renderiza o design fiel da landing (DriveBooks, feito no Claude Design) e
@@ -66,5 +67,16 @@ export function LandingClient() {
     return () => root.removeEventListener("click", handleClick);
   }, []);
 
-  return <div ref={ref} dangerouslySetInnerHTML={{ __html: LANDING_HTML }} />;
+  /*
+   * Mobile e desktop convivem: os dois markups são renderizados e a troca é
+   * feita por CSS (media query em 1024px, ver app/globals.css), o que é
+   * SSR-friendly e funciona sem JS. Ambos ficam dentro do mesmo <div ref>,
+   * então o handler delegado de checkout cobre os CTAs das duas versões.
+   */
+  return (
+    <div ref={ref}>
+      <div className="dc-mobile" dangerouslySetInnerHTML={{ __html: LANDING_HTML }} />
+      <div className="dc-desktop" dangerouslySetInnerHTML={{ __html: LANDING_HTML_DESKTOP }} />
+    </div>
+  );
 }
