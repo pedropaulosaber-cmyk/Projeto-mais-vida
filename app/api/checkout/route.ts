@@ -24,6 +24,28 @@ function getClientIp(req: NextRequest): string {
   return fwd?.split(",")[0]?.trim() || "unknown";
 }
 
+/*
+ * URL base para success_url/cancel_url. Derivada da PRÓPRIA requisição (origin/
+ * host) para não depender de NEXT_PUBLIC_SITE_URL — que, por ser NEXT_PUBLIC_*,
+ * é inlinada em build e "vazava" http://localhost:3000 em produção. Assim
+ * funciona em produção, preview e local sem configuração manual.
+ */
+function getBaseUrl(req: NextRequest): string {
+  const origin = req.headers.get("origin");
+  if (origin) return origin;
+
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (host) {
+    const proto = req.headers.get("x-forwarded-proto") ?? "https";
+    return `${proto}://${host}`;
+  }
+
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+  return getEnv("NEXT_PUBLIC_SITE_URL") ?? "http://localhost:3000";
+}
+
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
   const limit = rateLimit(`checkout:${ip}`, 10, 60_000);
@@ -43,7 +65,7 @@ export async function POST(req: NextRequest) {
     // corpo ausente/malformado é aceitável — ctaId é só metadado opcional
   }
 
-  const siteUrl = getEnv("NEXT_PUBLIC_SITE_URL") ?? "http://localhost:3000";
+  const siteUrl = getBaseUrl(req);
 
   try {
     const session = await getStripe().checkout.sessions.create({
