@@ -4,19 +4,19 @@ import "./globals.css";
 // SEO base (skill: seo-content refina isto na etapa correspondente — title/description
 // finais, Open Graph, JSON-LD serão adicionados lá).
 export const metadata: Metadata = {
-  title: "EbookDrive — acesso a uma biblioteca completa de ebooks",
+  title: "DriveBooks — +1.500 livros digitais por R$ 39,90",
   description:
-    "Acesso imediato a diversos ebooks em um único pagamento, por uma fração do preço de comprar cada título separadamente.",
+    "Uma biblioteca completa com mais de 1.500 livros digitais via Google Drive. Acesso vitalício, entrega imediata e leitura em qualquer dispositivo — pagamento único de R$ 39,90.",
   metadataBase: process.env.NEXT_PUBLIC_SITE_URL
     ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
     : undefined,
 };
 
-// Mobile-first: viewport correto para telas pequenas (prioridade do §2).
+// Mobile-first: viewport correto para telas pequenas (prioridade absoluta).
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#ffc61a",
+  themeColor: "#FFC107",
 };
 
 export default function RootLayout({

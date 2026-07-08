@@ -35,7 +35,11 @@ ebooks no Google Drive, vendido por pagamento único via Stripe.
 │   ├── email.ts                → e-mail de entrega + automações
 │   ├── db.ts                   → vendas + eventos (painel admin)
 │   └── rate-limit.ts           → rate limiting das rotas de API
-├── components/                 → seções da landing (a preencher)
+├── components/
+│   ├── LandingClient.tsx       → injeta o design da landing e liga os CTAs ao checkout
+│   └── landingMarkup.ts        → markup do design (DriveBooks, feito no Claude Design)
+├── public/books/               → capas dos livros (imagens do design)
+├── public/fonts/               → Inter + Poppins self-hosted (woff2)
 ├── next.config.mjs             → cabeçalhos de segurança (CSP, HSTS, X-Frame-Options...)
 ├── .env.example                → todas as chaves necessárias (sem valores)
 └── package.json
