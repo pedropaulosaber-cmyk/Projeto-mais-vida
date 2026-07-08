@@ -1,27 +1,24 @@
 /*
- * Acesso a dados — ESQUELETO (Etapa 1).
+ * Acesso a dados (Postgres — Supabase/Vercel Postgres via DATABASE_URL).
  *
  * Responsabilidades:
- *   - Registrar VENDAS confirmadas (idempotência por stripe_session_id) — usado
- *     pelo webhook e exibido no painel admin (prompt §9).
- *   - Registrar EVENTOS do funil (page_view, begin_checkout, cta_click, purchase)
- *     para o painel admin consultar sem depender só do GA4 (skill conversion-tracking).
+ *   - Registrar VENDAS de forma IDEMPOTENTE (stripe_session_id é UNIQUE — o
+ *     Stripe pode reenviar o mesmo evento de webhook várias vezes).
+ *   - Registrar EVENTOS do funil para o painel admin (prompt §9).
  *
- * Decisão de arquitetura sugerida (a validar): Postgres gerenciado — Supabase ou
- * Vercel Postgres — via DATABASE_URL. Esquema inicial proposto:
- *
- *   sales(id, stripe_session_id UNIQUE, buyer_email, amount_cents, currency,
- *         status, created_at)
- *   events(id, type, session_id, utm_source, utm_medium, utm_campaign,
- *          path, meta JSONB, created_at)
- *
- * A conexão/queries reais entram na etapa do painel admin — mantido como stub.
+ * Rode db/schema.sql uma vez no banco antes de usar em produção.
  */
 import "server-only";
+import { Pool } from "pg";
 import { requireEnv } from "./env";
 
-export function getDatabaseUrl(): string {
-  return requireEnv("DATABASE_URL");
+let _pool: Pool | null = null;
+
+function getPool(): Pool {
+  if (!_pool) {
+    _pool = new Pool({ connectionString: requireEnv("DATABASE_URL") });
+  }
+  return _pool;
 }
 
 export interface SaleRecord {
@@ -31,14 +28,46 @@ export interface SaleRecord {
   currency: string;
 }
 
-// Idempotente por stripeSessionId (o Stripe pode reenviar o mesmo evento).
-export async function recordSaleIdempotent(_sale: SaleRecord): Promise<void> {
-  throw new Error("Não implementado — esqueleto (Etapa 1).");
+/**
+ * Insere a venda se ainda não existir. Retorna `true` se esta chamada criou o
+ * registro (venda nova — deve prosseguir com liberação de acesso + e-mail) ou
+ * `false` se já existia (reentrega do webhook — não repetir efeitos colaterais).
+ */
+export async function recordSaleIdempotent(sale: SaleRecord): Promise<boolean> {
+  const result = await getPool().query(
+    `INSERT INTO sales (stripe_session_id, buyer_email, amount_cents, currency)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (stripe_session_id) DO NOTHING
+     RETURNING id`,
+    [sale.stripeSessionId, sale.buyerEmail, sale.amountCents, sale.currency],
+  );
+  return (result.rowCount ?? 0) > 0;
 }
 
 export async function recordEvent(
-  _type: string,
-  _payload: Record<string, unknown>,
+  type: string,
+  payload: Record<string, unknown> = {},
 ): Promise<void> {
-  throw new Error("Não implementado — esqueleto (Etapa 1).");
+  const { sessionId, utmSource, utmMedium, utmCampaign, path, ...meta } = payload as {
+    sessionId?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+    path?: string;
+    [key: string]: unknown;
+  };
+
+  await getPool().query(
+    `INSERT INTO events (type, session_id, utm_source, utm_medium, utm_campaign, path, meta)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      type,
+      sessionId ?? null,
+      utmSource ?? null,
+      utmMedium ?? null,
+      utmCampaign ?? null,
+      path ?? null,
+      JSON.stringify(meta ?? {}),
+    ],
+  );
 }

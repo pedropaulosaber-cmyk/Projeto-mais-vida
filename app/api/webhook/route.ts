@@ -1,26 +1,80 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
+import { getStripe } from "@/lib/stripe";
+import { requireEnv } from "@/lib/env";
+import { recordSaleIdempotent, recordEvent } from "@/lib/db";
+import { grantFolderAccess } from "@/lib/drive";
+import { sendDeliveryEmail } from "@/lib/email";
+import { formatBRL } from "@/lib/format";
 
 /*
- * POST /api/webhook — ESQUELETO (Etapa 1). A ÚNICA fonte de verdade do pagamento.
+ * POST /api/webhook — a ÚNICA fonte de verdade do pagamento (skill
+ * stripe-drive-checkout, Passo 3). Nenhum acesso é liberado sem passar por
+ * aqui, e sem a assinatura do Stripe ser validada primeiro.
  *
- * Responsabilidade (skill stripe-drive-checkout, Passo 3):
- *   1. Validar a assinatura do Stripe com STRIPE_WEBHOOK_SECRET (body CRU).
- *      Nenhum acesso é liberado sem essa validação.
- *   2. No evento `checkout.session.completed`:
- *        - registrar a venda (lib/db.ts) de forma IDEMPOTENTE (session.id único)
- *        - liberar acesso ao Drive por e-mail do comprador (lib/drive.ts —
- *          entrega Opção B: permissions.create role:reader)
- *        - enviar o e-mail de entrega instantâneo (lib/email.ts)
- *        - registrar o evento `purchase` server-side (conversion-tracking)
- *
- * CRÍTICO no Next.js App Router: o corpo precisa ser lido CRU (await req.text())
- * para a verificação de assinatura funcionar. Runtime Node obrigatório.
+ * CRÍTICO: o corpo precisa ser lido CRU (req.text(), não req.json()) — a
+ * verificação de assinatura falha se o corpo já tiver sido parseado/reserializado.
  */
 export const runtime = "nodejs";
 
-export async function POST() {
-  return NextResponse.json(
-    { error: "Não implementado — esqueleto (Etapa 1)." },
-    { status: 501 },
-  );
+export async function POST(req: NextRequest) {
+  const signature = req.headers.get("stripe-signature");
+  const rawBody = await req.text();
+
+  if (!signature) {
+    return NextResponse.json({ error: "Assinatura ausente." }, { status: 400 });
+  }
+
+  let event: Stripe.Event;
+  try {
+    event = getStripe().webhooks.constructEvent(
+      rawBody,
+      signature,
+      requireEnv("STRIPE_WEBHOOK_SECRET"),
+    );
+  } catch (err) {
+    console.error("[webhook] assinatura inválida:", err);
+    return NextResponse.json({ error: "Assinatura inválida." }, { status: 400 });
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const buyerEmail = session.customer_details?.email;
+    const amountCents = session.amount_total ?? 0;
+    const currency = session.currency ?? "brl";
+
+    if (!buyerEmail) {
+      console.error("[webhook] sessão sem e-mail do comprador:", session.id);
+      return NextResponse.json({ received: true });
+    }
+
+    const isNewSale = await recordSaleIdempotent({
+      stripeSessionId: session.id,
+      buyerEmail,
+      amountCents,
+      currency,
+    });
+
+    if (isNewSale) {
+      // Efeitos colaterais só rodam na PRIMEIRA vez que este evento é processado
+      // (o Stripe pode reenviar o mesmo evento — sem isso duplicaríamos o
+      // convite do Drive e o e-mail de entrega).
+      await grantFolderAccess(buyerEmail);
+      await sendDeliveryEmail({
+        to: buyerEmail,
+        amountPaidFormatted: formatBRL(amountCents),
+      });
+      await recordEvent("purchase", {
+        sessionId: session.id,
+        amountCents,
+        currency,
+      }).catch((err) => {
+        // Registro de evento é só para o painel admin — falha aqui não deve
+        // impedir a resposta 200 ao Stripe (o acesso já foi liberado).
+        console.error("[webhook] falha ao registrar evento purchase:", err);
+      });
+    }
+  }
+
+  return NextResponse.json({ received: true });
 }

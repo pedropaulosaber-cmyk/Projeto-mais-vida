@@ -1,20 +1,21 @@
 /*
- * Cliente Stripe configurado — ESQUELETO (Etapa 1).
+ * Cliente Stripe configurado (skill stripe-drive-checkout).
  *
- * Centraliza a criação do cliente para que checkout e webhook usem a MESMA
- * instância/versão de API. A secret key só existe no server (lib server-only).
- * A implementação real (import Stripe from "stripe"; new Stripe(...)) entra na
- * etapa da skill stripe-drive-checkout — mantido como stub para não exigir a
- * chave durante o esqueleto.
+ * Instância única usada por /api/checkout e /api/webhook — versão de API fixa
+ * para os dois lados ficarem sempre em sincronia. Secret key só existe aqui,
+ * server-only, nunca chega ao bundle do client.
  */
 import "server-only";
+import Stripe from "stripe";
 import { requireEnv } from "./env";
 
-export function getStripeSecretKey(): string {
-  return requireEnv("STRIPE_SECRET_KEY");
-}
+let _stripe: Stripe | null = null;
 
-// Placeholder do cliente. Será substituído por:
-//   import Stripe from "stripe";
-//   export const stripe = new Stripe(getStripeSecretKey());
-export const stripe = null;
+export function getStripe(): Stripe {
+  if (!_stripe) {
+    _stripe = new Stripe(requireEnv("STRIPE_SECRET_KEY"), {
+      apiVersion: "2025-02-24.acacia",
+    });
+  }
+  return _stripe;
+}
