@@ -1,0 +1,403 @@
+/* =============================================================================
+   Landing EbookDrive — estilos compartilhados. Mobile-first (base = 375px).
+   Identidade: base branca, destaque amarelo, texto sempre escuro (contraste).
+   ============================================================================= */
+
+.wrap {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+
+.section {
+  padding-block: 44px;
+}
+
+.sectionMuted {
+  background: var(--color-surface);
+  border-block: 1px solid var(--color-border);
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  line-height: 1.25;
+  margin: 0 0 20px;
+  text-align: center;
+}
+
+/* ---------- Header ---------- */
+.siteHeader {
+  border-bottom: 1px solid var(--color-border);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 14px;
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+.brandMark {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.9rem;
+}
+
+/* ---------- CTA (botão de compra) ---------- */
+.ctaWrapper {
+  width: 100%;
+}
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%; /* full-width no mobile (prioridade §2) */
+  padding: 17px 24px;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: 2px solid var(--color-accent-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+.cta:hover:not(:disabled) {
+  background: var(--color-accent-strong);
+}
+.cta:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.cta:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+.ctaError {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  padding-block: 32px 40px;
+}
+.heroContent {
+  text-align: center;
+}
+.badge {
+  display: inline-block;
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent);
+  color: var(--color-on-accent);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+.title {
+  font-size: 2rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+}
+.titleHighlight {
+  background: linear-gradient(180deg, transparent 62%, var(--color-accent) 62%);
+  padding-inline: 2px;
+}
+.subtitle {
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+  margin: 0 auto 24px;
+  max-width: 52ch;
+}
+.heroCta {
+  max-width: 380px;
+  margin-inline: auto;
+}
+.heroPriceHint {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+.heroVisual {
+  margin-top: 32px;
+}
+
+/* ---------- Book stack (leque de ebooks, CSS 3D) ---------- */
+.bookStack {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: clamp(230px, 58vw, 340px);
+  perspective: 1200px;
+  --gap: clamp(32px, 9.5vw, 46px);
+}
+.book {
+  position: absolute;
+  width: clamp(90px, 24vw, 150px);
+  aspect-ratio: 1 / 1.6;
+  border-radius: 3px 9px 9px 3px;
+  box-shadow: -12px 14px 28px rgba(0, 0, 0, 0.28);
+  transform: translateX(
+      calc((var(--i) - (var(--n) - 1) / 2) * var(--gap))
+    )
+    rotateY(-20deg)
+    rotate(calc((var(--i) - (var(--n) - 1) / 2) * 3deg));
+  z-index: calc(var(--i));
+  overflow: hidden;
+  color: #fff;
+}
+.book[data-tone="a"] { background: linear-gradient(160deg, #3b3b46, #23232b); }
+.book[data-tone="b"] { background: linear-gradient(160deg, #4a4551, #2c2833); }
+.book[data-tone="c"] { background: linear-gradient(160deg, #384049, #1f242b); }
+.book[data-tone="d"] { background: linear-gradient(160deg, #454236, #2a2822); }
+.book[data-tone="e"] { background: linear-gradient(160deg, #3d4348, #23272b); }
+.bookBand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 26%;
+  height: 12%;
+  background: var(--color-accent);
+}
+.bookLabel {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 16%;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.bookPlaceholderTag {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 7%;
+  font-size: 0.55rem;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Oferta / preço ---------- */
+.offerCard {
+  max-width: 460px;
+  margin-inline: auto;
+  text-align: center;
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  padding: 28px 22px;
+}
+.priceRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.priceOriginal {
+  font-size: 1.2rem;
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+.priceNow {
+  font-size: 2.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.discountBadge {
+  display: inline-block;
+  background: var(--color-on-accent);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-top: 4px;
+}
+.paymentNote {
+  margin: 10px 0 20px;
+  font-weight: 700;
+}
+.offerCta {
+  max-width: 380px;
+  margin-inline: auto;
+}
+.offerNote {
+  margin: 14px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* ---------- Comparação de valor ---------- */
+.compareIntro {
+  text-align: center;
+  color: var(--color-text-muted);
+  max-width: 54ch;
+  margin: 0 auto 24px;
+}
+.compareGrid {
+  display: grid;
+  gap: 16px;
+  max-width: 720px;
+  margin-inline: auto;
+}
+.compareCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 22px;
+  background: var(--color-bg);
+  text-align: center;
+}
+.compareCardHighlight {
+  border: 2px solid var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.compareTitle {
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.comparePrice {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin: 6px 0;
+}
+.compareDesc {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  margin: 0;
+}
+.estimateNote {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 18px auto 0;
+  max-width: 52ch;
+}
+
+/* ---------- Benefícios ---------- */
+.benefitList {
+  list-style: none;
+  padding: 0;
+  margin: 0 auto;
+  max-width: 620px;
+  display: grid;
+  gap: 14px;
+}
+.benefitItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+}
+.benefitCheck {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+.benefitText {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ---------- CTA final ---------- */
+.ctaFinal {
+  text-align: center;
+}
+.ctaFinalTitle {
+  font-size: 1.5rem;
+  margin: 0 0 10px;
+}
+.ctaFinalText {
+  color: var(--color-text-muted);
+  margin: 0 auto 22px;
+  max-width: 48ch;
+}
+.ctaFinalInner {
+  max-width: 380px;
+  margin-inline: auto;
+}
+
+/* ---------- Footer ---------- */
+.footer {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.footerInner {
+  padding-block: 28px;
+  text-align: center;
+}
+.footerBrand {
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.footerLinks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+.footerLinks a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+.footerLinks a:hover {
+  text-decoration: underline;
+}
+.footerNote {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* =============================================================================
+   Desktop / telas maiores (adaptação a partir do mobile)
+   ============================================================================= */
+@media (min-width: 768px) {
+  .section {
+    padding-block: 64px;
+  }
+  .title {
+    font-size: 2.7rem;
+  }
+  .sectionTitle {
+    font-size: 1.9rem;
+  }
+  .cta {
+    font-size: 1.12rem;
+  }
+  .compareGrid {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+  .hero {
+    padding-block: 56px 64px;
+  }
+}
