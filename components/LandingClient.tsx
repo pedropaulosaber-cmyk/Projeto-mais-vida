@@ -241,14 +241,12 @@ export function LandingClient() {
           onClick={() => !redirecting && setPendingCta(null)}
         >
           <div style={S.card} onClick={(e) => e.stopPropagation()}>
-            <div style={S.icon}>📧</div>
             <h2 id="email-notice-title" style={S.title}>
-              Atenção ao e-mail
+              💡 Dica rápida
             </h2>
             <p style={S.text}>
-              Na próxima tela, o Stripe vai pedir seu e-mail para o pagamento.
-              Use o e-mail onde você quer receber o acesso à biblioteca — é
-              para esse endereço que enviaremos o convite do Google Drive.
+              No próximo passo, use o e-mail onde você quer receber seu
+              acesso — é para ele que enviamos o link do Drive.
             </p>
             <button
               type="button"
@@ -256,7 +254,7 @@ export function LandingClient() {
               disabled={redirecting}
               onClick={() => proceedToCheckout(pendingCta)}
             >
-              {redirecting ? "Redirecionando…" : "Entendi, continuar para o pagamento"}
+              {redirecting ? "Redirecionando…" : "Continuar"}
             </button>
             <button
               type="button"
@@ -277,7 +275,7 @@ const S: Record<string, React.CSSProperties> = {
   overlay: {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,.6)",
+    background: "rgba(0,0,0,.45)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -286,27 +284,26 @@ const S: Record<string, React.CSSProperties> = {
   },
   card: {
     width: "100%",
-    maxWidth: 380,
+    maxWidth: 300,
     background: "#fff",
-    borderRadius: 18,
-    padding: "28px 24px",
+    borderRadius: 16,
+    padding: "20px 18px",
     textAlign: "center",
-    boxShadow: "0 24px 60px -20px rgba(0,0,0,.5)",
+    boxShadow: "0 20px 50px -20px rgba(0,0,0,.4)",
   },
-  icon: { fontSize: 36, marginBottom: 10 },
   title: {
     fontFamily: "Poppins, sans-serif",
-    fontSize: 19,
-    fontWeight: 800,
+    fontSize: 15,
+    fontWeight: 700,
     color: "#1A1A1A",
-    margin: "0 0 10px",
+    margin: "0 0 8px",
   },
   text: {
     fontFamily: "Inter, sans-serif",
-    fontSize: 14,
-    lineHeight: 1.55,
+    fontSize: 13,
+    lineHeight: 1.5,
     color: "#4b4b4b",
-    margin: "0 0 20px",
+    margin: "0 0 16px",
   },
   confirmBtn: {
     display: "block",
@@ -314,11 +311,11 @@ const S: Record<string, React.CSSProperties> = {
     background: "#FFC107",
     color: "#1A1A1A",
     fontFamily: "Poppins, sans-serif",
-    fontWeight: 800,
-    fontSize: 15,
+    fontWeight: 700,
+    fontSize: 14,
     border: "none",
-    borderRadius: 12,
-    padding: "15px",
+    borderRadius: 10,
+    padding: "12px",
     cursor: "pointer",
     marginBottom: 10,
   },
