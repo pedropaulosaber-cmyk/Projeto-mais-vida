@@ -3,6 +3,15 @@
 import { useEffect, useRef } from "react";
 import { LANDING_HTML } from "./landingMarkup";
 import { LANDING_HTML_DESKTOP } from "./landingMarkupDesktop";
+import {
+  initTracking,
+  getTrackingContext,
+  track,
+  trackPixel,
+} from "@/lib/trackingClient";
+
+// Preço só para os eventos de tracking (o valor cobrado de verdade vem do Stripe).
+const CHECKOUT_VALUE = 39.9;
 
 /*
  * Renderiza o design fiel da landing (DriveBooks, feito no Claude Design) e
@@ -22,6 +31,10 @@ export function LandingClient() {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Captura UTMs/fbp/fbc e registra a visita (skill conversion-tracking).
+    initTracking();
+    void track("page_view");
+
     const root = ref.current;
     if (!root) return;
 
@@ -33,8 +46,12 @@ export function LandingClient() {
       e.preventDefault();
       const ctaId = (link.textContent || "cta").trim().slice(0, 40);
 
-      // TODO(conversion-tracking): trackEvent("cta_click", { ctaId });
-      // TODO(conversion-tracking): trackEvent("begin_checkout");
+      // Eventos de funil: no nosso banco (painel admin) + no Meta Pixel.
+      void track("cta_click", { ctaId });
+      void track("begin_checkout");
+      trackPixel("InitiateCheckout", { value: CHECKOUT_VALUE, currency: "BRL" });
+
+      const ctx = getTrackingContext();
 
       const externalUrl = process.env.NEXT_PUBLIC_CHECKOUT_URL;
       if (externalUrl) {
@@ -46,7 +63,15 @@ export function LandingClient() {
         const res = await fetch("/api/checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ctaId }),
+          body: JSON.stringify({
+            ctaId,
+            sessionId: ctx.sessionId,
+            utmSource: ctx.utmSource,
+            utmMedium: ctx.utmMedium,
+            utmCampaign: ctx.utmCampaign,
+            fbp: ctx.fbp,
+            fbc: ctx.fbc,
+          }),
         });
         if (!res.ok) throw new Error("checkout-indisponivel");
         const data: { url?: string } = await res.json();

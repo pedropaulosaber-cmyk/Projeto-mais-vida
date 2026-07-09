@@ -7,6 +7,7 @@ import { grantFolderAccess, revokeFolderAccess } from "@/lib/drive";
 import { sendDeliveryEmail } from "@/lib/email";
 import { formatBRL } from "@/lib/format";
 import { PRODUCT_METADATA_VALUE } from "@/lib/product";
+import { sendMetaPurchase } from "@/lib/meta";
 
 /*
  * POST /api/webhook — a ÚNICA fonte de verdade do pagamento (skill
@@ -78,8 +79,26 @@ export async function POST(req: NextRequest) {
         to: buyerEmail,
         amountPaidFormatted: formatBRL(amountCents),
       });
+
+      // Conversão real, server-side (skill conversion-tracking, Passo 4). O
+      // event_id = session.id deixa o Meta deduplicar reenvios do webhook.
+      await sendMetaPurchase({
+        eventId: session.id,
+        email: buyerEmail,
+        valueCents: amountCents,
+        currency,
+        fbp: session.metadata?.fbp ?? null,
+        fbc: session.metadata?.fbc ?? null,
+      }).catch((err) => {
+        console.error("[webhook] falha ao enviar Purchase p/ Meta CAPI:", err);
+      });
+
       await recordEvent("purchase", {
-        sessionId: session.id,
+        sessionId: session.metadata?.sid,
+        utmSource: session.metadata?.utm_source,
+        utmMedium: session.metadata?.utm_medium,
+        utmCampaign: session.metadata?.utm_campaign,
+        stripeSessionId: session.id,
         amountCents,
         currency,
       }).catch((err) => {
