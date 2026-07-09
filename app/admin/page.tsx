@@ -20,6 +20,7 @@ import {
   getVisitsSummary,
 } from "@/lib/adminMetrics";
 import { AdminAutoRefresh } from "@/components/AdminAutoRefresh";
+import { AdminEventCenter } from "@/components/AdminEventCenter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,6 +109,8 @@ export default async function AdminPage({
           </a>
         ))}
       </nav>
+
+      <AdminEventCenter />
 
       {/* ---------- Visitas ---------- */}
       <Section accent="#60A5FA" title="Visitas" subtitle="Quem chegou na landing">

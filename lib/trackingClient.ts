@@ -60,6 +60,26 @@ export function initTracking(): void {
   }
 
   armEngagement();
+  armHeartbeat();
+}
+
+let heartbeatArmed = false;
+
+/*
+ * Pulso de "estou aqui agora", enviado a cada 15s enquanto a aba está visível
+ * (pausa se o usuário troca de aba). Alimenta o contador "visitantes agora"
+ * da Central de eventos do painel admin — sem isso não dá pra saber quem
+ * está na página neste exato momento, só quem já passou por ela.
+ */
+function armHeartbeat(): void {
+  if (heartbeatArmed) return;
+  heartbeatArmed = true;
+
+  const send = () => {
+    if (document.visibilityState === "visible") void track("heartbeat");
+  };
+  send();
+  setInterval(send, 15_000);
 }
 
 /*
@@ -166,7 +186,7 @@ export function trackPixel(
 
 /** Registra um evento do funil no banco (para o painel admin). Best-effort. */
 export async function track(
-  type: "page_view" | "view_item" | "begin_checkout" | "cta_click",
+  type: "page_view" | "view_item" | "begin_checkout" | "cta_click" | "heartbeat",
   meta: Record<string, unknown> = {},
 ): Promise<void> {
   const ctx = getTrackingContext();

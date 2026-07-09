@@ -54,8 +54,58 @@ export interface DailySalesRow {
   revenueCents: number;
 }
 
+export interface EventRow {
+  type: string;
+  path: string | null;
+  sessionId: string | null;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 function since(days: number): string {
   return `now() - interval '${Math.max(1, Math.min(365, Math.floor(days)))} days'`;
+}
+
+/* ---------- Central de eventos (tempo real) ---------- */
+
+/**
+ * Visitantes com pulso (heartbeat ou page_view) nos últimos `windowSeconds` —
+ * aproximação de "quem está na página agora" sem precisar de WebSocket.
+ */
+export async function getLiveVisitorsCount(windowSeconds = 40): Promise<number> {
+  const [row] = await query<{ count: string }>(
+    `SELECT COUNT(DISTINCT session_id) AS count
+     FROM events
+     WHERE type IN ('heartbeat', 'page_view')
+       AND session_id IS NOT NULL
+       AND created_at >= now() - interval '${Math.max(5, Math.min(600, Math.floor(windowSeconds)))} seconds'`,
+  );
+  return Number(row?.count ?? 0);
+}
+
+/** Feed cru dos últimos eventos do funil, para a Central de eventos. Heartbeats ficam de fora — só alimentam o contador ao vivo, não o feed. */
+export async function getRecentEvents(limit = 40): Promise<EventRow[]> {
+  const rows = await query<{
+    type: string;
+    path: string | null;
+    session_id: string | null;
+    meta: unknown;
+    created_at: string;
+  }>(
+    `SELECT type, path, session_id, meta, created_at
+     FROM events
+     WHERE type != 'heartbeat'
+     ORDER BY created_at DESC
+     LIMIT $1`,
+    [Math.max(1, Math.min(100, limit))],
+  );
+  return rows.map((r) => ({
+    type: r.type,
+    path: r.path,
+    sessionId: r.session_id,
+    meta: (r.meta as Record<string, unknown>) ?? null,
+    createdAt: r.created_at,
+  }));
 }
 
 /* ---------- Visitas ---------- */
