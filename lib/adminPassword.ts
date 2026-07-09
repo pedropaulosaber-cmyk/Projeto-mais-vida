@@ -18,8 +18,10 @@ export function hashPassword(password: string): string {
 }
 
 export function verifyPassword(password: string): boolean {
-  const stored = requireEnv("ADMIN_PASSWORD_HASH");
-  const [salt, hash] = stored.split(":");
+  // .trim() por segurança: é comum sobrar um espaço/quebra de linha ao colar
+  // o valor no painel da Vercel, o que faria a comparação falhar silenciosamente.
+  const stored = requireEnv("ADMIN_PASSWORD_HASH").trim();
+  const [salt, hash] = stored.split(":").map((part) => part.trim());
   if (!salt || !hash) return false;
 
   const candidate = scryptSync(password, salt, 64);
