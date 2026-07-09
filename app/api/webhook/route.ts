@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { requireEnv } from "@/lib/env";
 import { recordSaleIdempotent, recordEvent } from "@/lib/db";
-import { grantFolderAccess } from "@/lib/drive";
+import { grantFolderAccess, revokeFolderAccess } from "@/lib/drive";
 import { sendDeliveryEmail } from "@/lib/email";
 import { formatBRL } from "@/lib/format";
 import { PRODUCT_METADATA_VALUE } from "@/lib/product";
@@ -88,6 +88,50 @@ export async function POST(req: NextRequest) {
         console.error("[webhook] falha ao registrar evento purchase:", err);
       });
     }
+  }
+
+  if (event.type === "charge.dispute.created") {
+    // Chargeback/contestação (skill fraud-prevention, Passo 4): revoga o acesso
+    // ao Drive automaticamente e registra o caso para follow-up. O evento chega
+    // para TODA a conta Stripe (compartilhada), então filtramos pelo mesmo
+    // metadata.produto — que propagamos para o PaymentIntent no checkout.
+    const dispute = event.data.object as Stripe.Dispute;
+    const chargeId =
+      typeof dispute.charge === "string" ? dispute.charge : dispute.charge.id;
+
+    const charge = await getStripe().charges.retrieve(chargeId, {
+      expand: ["payment_intent"],
+    });
+
+    const paymentIntent = charge.payment_intent;
+    const produto =
+      typeof paymentIntent === "object" && paymentIntent
+        ? paymentIntent.metadata?.produto
+        : undefined;
+
+    if (produto !== PRODUCT_METADATA_VALUE) {
+      return NextResponse.json({ received: true });
+    }
+
+    const buyerEmail =
+      charge.billing_details?.email ?? charge.receipt_email ?? undefined;
+
+    if (buyerEmail) {
+      await revokeFolderAccess(buyerEmail);
+    } else {
+      console.error("[webhook] disputa sem e-mail do comprador:", dispute.id);
+    }
+
+    await recordEvent("chargeback", {
+      disputeId: dispute.id,
+      chargeId,
+      amountCents: dispute.amount,
+      currency: dispute.currency,
+      reason: dispute.reason,
+      buyerEmail: buyerEmail ?? null,
+    }).catch((err) => {
+      console.error("[webhook] falha ao registrar evento chargeback:", err);
+    });
   }
 
   return NextResponse.json({ received: true });
