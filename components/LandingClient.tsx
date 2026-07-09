@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LANDING_HTML } from "./landingMarkup";
 import { LANDING_HTML_DESKTOP } from "./landingMarkupDesktop";
 import {
@@ -18,17 +18,65 @@ const CHECKOUT_VALUE = 39.9;
  * conecta os CTAs à funcionalidade de compra.
  *
  * Todos os botões de compra no design são <a href="#CHECKOUT_LINK">. Aqui, um
- * handler delegado intercepta o clique e:
- *   - se NEXT_PUBLIC_CHECKOUT_URL estiver definido (ex: link Hotmart/Kiwify/Stripe),
- *     redireciona direto para lá;
- *   - senão, chama POST /api/checkout (fluxo do próprio projeto). Enquanto esse
- *     endpoint é stub (etapa do Stripe), degrada com uma mensagem amigável.
+ * handler delegado intercepta o clique e abre um aviso (modal) confirmando
+ * que o comprador deve usar, na tela do Stripe, o e-mail onde quer receber o
+ * acesso ao Drive — só depois de confirmar é que seguimos para o checkout.
+ * Isso evita o caso comum de alguém digitar um e-mail errado na hora de pagar
+ * e não receber o acesso.
  *
  * Na etapa da skill conversion-tracking, este é o ponto onde disparam os eventos
  * cta_click / begin_checkout (com o texto/posição do CTA clicado).
  */
 export function LandingClient() {
   const ref = useRef<HTMLDivElement>(null);
+  const [pendingCta, setPendingCta] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
+
+  async function proceedToCheckout(ctaId: string) {
+    setRedirecting(true);
+
+    // Eventos de funil: no nosso banco (painel admin) + no Meta Pixel.
+    void track("cta_click", { ctaId });
+    void track("begin_checkout");
+    trackPixel("InitiateCheckout", { value: CHECKOUT_VALUE, currency: "BRL" });
+
+    const ctx = getTrackingContext();
+
+    const externalUrl = process.env.NEXT_PUBLIC_CHECKOUT_URL;
+    if (externalUrl) {
+      window.location.href = externalUrl;
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ctaId,
+          sessionId: ctx.sessionId,
+          utmSource: ctx.utmSource,
+          utmMedium: ctx.utmMedium,
+          utmCampaign: ctx.utmCampaign,
+          fbp: ctx.fbp,
+          fbc: ctx.fbc,
+        }),
+      });
+      if (!res.ok) throw new Error("checkout-indisponivel");
+      const data: { url?: string } = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      throw new Error("sem-url");
+    } catch {
+      setRedirecting(false);
+      window.alert(
+        "O checkout ainda será ativado. Configure NEXT_PUBLIC_CHECKOUT_URL " +
+          "(link de pagamento) ou finalize a etapa do Stripe para concluir a compra.",
+      );
+    }
+  }
 
   useEffect(() => {
     // Captura UTMs/fbp/fbc e registra a visita (skill conversion-tracking).
@@ -38,54 +86,14 @@ export function LandingClient() {
     const root = ref.current;
     if (!root) return;
 
-    async function handleClick(e: MouseEvent) {
+    function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement | null;
       const link = target?.closest<HTMLAnchorElement>('a[href="#CHECKOUT_LINK"]');
       if (!link) return;
 
       e.preventDefault();
       const ctaId = (link.textContent || "cta").trim().slice(0, 40);
-
-      // Eventos de funil: no nosso banco (painel admin) + no Meta Pixel.
-      void track("cta_click", { ctaId });
-      void track("begin_checkout");
-      trackPixel("InitiateCheckout", { value: CHECKOUT_VALUE, currency: "BRL" });
-
-      const ctx = getTrackingContext();
-
-      const externalUrl = process.env.NEXT_PUBLIC_CHECKOUT_URL;
-      if (externalUrl) {
-        window.location.href = externalUrl;
-        return;
-      }
-
-      try {
-        const res = await fetch("/api/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ctaId,
-            sessionId: ctx.sessionId,
-            utmSource: ctx.utmSource,
-            utmMedium: ctx.utmMedium,
-            utmCampaign: ctx.utmCampaign,
-            fbp: ctx.fbp,
-            fbc: ctx.fbc,
-          }),
-        });
-        if (!res.ok) throw new Error("checkout-indisponivel");
-        const data: { url?: string } = await res.json();
-        if (data.url) {
-          window.location.href = data.url;
-          return;
-        }
-        throw new Error("sem-url");
-      } catch {
-        window.alert(
-          "O checkout ainda será ativado. Configure NEXT_PUBLIC_CHECKOUT_URL " +
-            "(link de pagamento) ou finalize a etapa do Stripe para concluir a compra.",
-        );
-      }
+      setPendingCta(ctaId);
     }
 
     root.addEventListener("click", handleClick);
@@ -149,6 +157,106 @@ export function LandingClient() {
     <div ref={ref}>
       <div className="dc-mobile" dangerouslySetInnerHTML={{ __html: LANDING_HTML }} />
       <div className="dc-desktop" dangerouslySetInnerHTML={{ __html: LANDING_HTML_DESKTOP }} />
+
+      {pendingCta !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="email-notice-title"
+          style={S.overlay}
+          onClick={() => !redirecting && setPendingCta(null)}
+        >
+          <div style={S.card} onClick={(e) => e.stopPropagation()}>
+            <div style={S.icon}>📧</div>
+            <h2 id="email-notice-title" style={S.title}>
+              Atenção ao e-mail
+            </h2>
+            <p style={S.text}>
+              Na próxima tela, o Stripe vai pedir seu e-mail para o pagamento.
+              Use o e-mail onde você quer receber o acesso à biblioteca — é
+              para esse endereço que enviaremos o convite do Google Drive.
+            </p>
+            <button
+              type="button"
+              style={S.confirmBtn}
+              disabled={redirecting}
+              onClick={() => proceedToCheckout(pendingCta)}
+            >
+              {redirecting ? "Redirecionando…" : "Entendi, continuar para o pagamento"}
+            </button>
+            <button
+              type="button"
+              style={S.cancelBtn}
+              disabled={redirecting}
+              onClick={() => setPendingCta(null)}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const S: Record<string, React.CSSProperties> = {
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,.6)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    zIndex: 1000,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 380,
+    background: "#fff",
+    borderRadius: 18,
+    padding: "28px 24px",
+    textAlign: "center",
+    boxShadow: "0 24px 60px -20px rgba(0,0,0,.5)",
+  },
+  icon: { fontSize: 36, marginBottom: 10 },
+  title: {
+    fontFamily: "Poppins, sans-serif",
+    fontSize: 19,
+    fontWeight: 800,
+    color: "#1A1A1A",
+    margin: "0 0 10px",
+  },
+  text: {
+    fontFamily: "Inter, sans-serif",
+    fontSize: 14,
+    lineHeight: 1.55,
+    color: "#4b4b4b",
+    margin: "0 0 20px",
+  },
+  confirmBtn: {
+    display: "block",
+    width: "100%",
+    background: "#FFC107",
+    color: "#1A1A1A",
+    fontFamily: "Poppins, sans-serif",
+    fontWeight: 800,
+    fontSize: 15,
+    border: "none",
+    borderRadius: 12,
+    padding: "15px",
+    cursor: "pointer",
+    marginBottom: 10,
+  },
+  cancelBtn: {
+    display: "block",
+    width: "100%",
+    background: "transparent",
+    color: "#6b7280",
+    fontFamily: "Inter, sans-serif",
+    fontSize: 13,
+    border: "none",
+    padding: "6px",
+    cursor: "pointer",
+  },
+};
