@@ -13,6 +13,121 @@ import {
 // Preço só para os eventos de tracking (o valor cobrado de verdade vem do Stripe).
 const CHECKOUT_VALUE = 39.9;
 
+// Velocidade de fluxo automático do carrossel "Uma amostra do acervo", em px/s.
+const CAROUSEL_SPEED_PX_S = 75;
+
+/*
+ * Motor do carrossel "Uma amostra do acervo": cada trilha (mobile/desktop) é
+ * uma faixa de imagens duplicada uma vez (para dar loop contínuo) com
+ * width:max-content — sem nenhuma animação CSS. Este loop via
+ * requestAnimationFrame aplica o transform diretamente:
+ *   - flui sozinho a uma velocidade constante por padrão;
+ *   - se o usuário arrasta a barra (<input type="range" data-carousel-scrub>)
+ *     logo abaixo, a posição passa a seguir o dedo/mouse (o fluxo automático
+ *     pausa);
+ *   - ao soltar, o fluxo automático retoma da posição em que parou — nunca
+ *     reseta nem pula.
+ * position "envolve" (wrap) em metade da largura da trilha, já que a segunda
+ * metade é uma cópia idêntica da primeira (loop perfeito).
+ */
+function setupCarousels(root: HTMLElement): () => void {
+  const prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+
+  const tracks = Array.from(
+    root.querySelectorAll<HTMLElement>("[data-carousel-track]"),
+  );
+  if (tracks.length === 0) return () => {};
+
+  const cleanups: (() => void)[] = [];
+  let rafId: number | null = null;
+
+  interface Engine {
+    track: HTMLElement;
+    scrub: HTMLInputElement | null;
+    position: number; // px, 0..halfWidth
+    halfWidth: number;
+    dragging: boolean;
+  }
+
+  const engines: Engine[] = tracks.map((track) => {
+    const wrap = track.parentElement;
+    const scrub = wrap?.parentElement?.querySelector<HTMLInputElement>(
+      "[data-carousel-scrub]",
+    ) ?? null;
+    return { track, scrub, position: 0, halfWidth: 0, dragging: false };
+  });
+
+  function measure(engine: Engine) {
+    // A trilha tem o conjunto de imagens duplicado uma vez — metade da
+    // largura total é um ciclo completo.
+    engine.halfWidth = engine.track.scrollWidth / 2 || 1;
+  }
+
+  engines.forEach((engine) => {
+    measure(engine);
+    engine.track.style.transform = "translateX(0px)";
+
+    // Imagens lazy mudam a largura conforme carregam — recalcula sob demanda.
+    const ro = new ResizeObserver(() => measure(engine));
+    ro.observe(engine.track);
+    cleanups.push(() => ro.disconnect());
+
+    if (engine.scrub) {
+      const scrub = engine.scrub;
+
+      const onInput = () => {
+        engine.dragging = true;
+        const frac = Number(scrub.value) / 1000;
+        engine.position = frac * engine.halfWidth;
+        engine.track.style.transform = `translateX(${-engine.position}px)`;
+      };
+      const onRelease = () => {
+        engine.dragging = false;
+      };
+
+      scrub.addEventListener("input", onInput);
+      scrub.addEventListener("change", onRelease);
+      scrub.addEventListener("pointerup", onRelease);
+      scrub.addEventListener("touchend", onRelease);
+      cleanups.push(() => {
+        scrub.removeEventListener("input", onInput);
+        scrub.removeEventListener("change", onRelease);
+        scrub.removeEventListener("pointerup", onRelease);
+        scrub.removeEventListener("touchend", onRelease);
+      });
+    }
+  });
+
+  if (!prefersReducedMotion) {
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000); // trava dt em picos (ex: aba volta do background)
+      last = now;
+
+      engines.forEach((engine) => {
+        if (engine.dragging || engine.halfWidth <= 1) return;
+        engine.position = (engine.position + CAROUSEL_SPEED_PX_S * dt) % engine.halfWidth;
+        engine.track.style.transform = `translateX(${-engine.position}px)`;
+        if (engine.scrub) {
+          engine.scrub.value = String(
+            Math.round((engine.position / engine.halfWidth) * 1000),
+          );
+        }
+      });
+
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+  }
+
+  return () => {
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    cleanups.forEach((fn) => fn());
+  };
+}
+
 /*
  * Renderiza o design fiel da landing (DriveBooks, feito no Claude Design) e
  * conecta os CTAs à funcionalidade de compra.
@@ -98,52 +213,11 @@ export function LandingClient() {
 
     root.addEventListener("click", handleClick);
 
-    // Carrossel "Uma amostra do acervo": desliza o dedo/mouse por cima para
-    // acelerar a animação temporariamente — some volta à velocidade normal
-    // um instante depois que o toque para.
-    const tracks = Array.from(
-      root.querySelectorAll<HTMLElement>("[data-carousel-track]"),
-    );
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-
-    const boostTimers = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
-    const boostCleanups: (() => void)[] = [];
-
-    if (!prefersReducedMotion) {
-      const BOOST_DURATION = "6s";
-      const COOLDOWN_MS = 800;
-
-      tracks.forEach((el) => {
-        const zone = el.parentElement ?? el; // wrapper com overflow:hidden, área visível do carrossel
-        const boost = () => {
-          el.style.animationDuration = BOOST_DURATION;
-          const existing = boostTimers.get(el);
-          if (existing) clearTimeout(existing);
-          boostTimers.set(
-            el,
-            setTimeout(() => {
-              el.style.animationDuration = el.dataset.duration ?? "";
-              boostTimers.delete(el);
-            }, COOLDOWN_MS),
-          );
-        };
-        zone.addEventListener("touchstart", boost, { passive: true });
-        zone.addEventListener("touchmove", boost, { passive: true });
-        zone.addEventListener("pointerdown", boost);
-        boostCleanups.push(() => {
-          zone.removeEventListener("touchstart", boost);
-          zone.removeEventListener("touchmove", boost);
-          zone.removeEventListener("pointerdown", boost);
-        });
-      });
-    }
+    const carouselCleanup = setupCarousels(root);
 
     return () => {
       root.removeEventListener("click", handleClick);
-      boostCleanups.forEach((fn) => fn());
-      boostTimers.forEach((t) => clearTimeout(t));
+      carouselCleanup();
     };
   }, []);
 

@@ -83,8 +83,12 @@ export async function getLiveVisitorsCount(windowSeconds = 40): Promise<number> 
   return Number(row?.count ?? 0);
 }
 
-/** Feed cru dos últimos eventos do funil, para a Central de eventos. Heartbeats ficam de fora — só alimentam o contador ao vivo, não o feed. */
-export async function getRecentEvents(limit = 40): Promise<EventRow[]> {
+/**
+ * Feed cru dos eventos do funil de HOJE (dia civil em America/Sao_Paulo, não
+ * UTC — senão "hoje" viraria "ontem à noite" pro usuário), para a Central de
+ * eventos. Heartbeats ficam de fora — só alimentam o contador ao vivo.
+ */
+export async function getRecentEvents(limit = 300): Promise<EventRow[]> {
   const rows = await query<{
     type: string;
     path: string | null;
@@ -95,9 +99,10 @@ export async function getRecentEvents(limit = 40): Promise<EventRow[]> {
     `SELECT type, path, session_id, meta, created_at
      FROM events
      WHERE type != 'heartbeat'
+       AND created_at >= date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo'
      ORDER BY created_at DESC
      LIMIT $1`,
-    [Math.max(1, Math.min(100, limit))],
+    [Math.max(1, Math.min(500, limit))],
   );
   return rows.map((r) => ({
     type: r.type,
