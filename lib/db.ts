@@ -61,6 +61,23 @@ export async function recordSaleIdempotent(sale: SaleRecord): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
+/** `true` se a entrega (Drive + e-mail) desta venda já foi confirmada. */
+export async function isDelivered(stripeSessionId: string): Promise<boolean> {
+  const result = await getPool().query(
+    `SELECT 1 FROM sales WHERE stripe_session_id = $1 AND delivered_at IS NOT NULL`,
+    [stripeSessionId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/** Marca a entrega como concluída — só depois que Drive + e-mail realmente saíram. */
+export async function markDelivered(stripeSessionId: string): Promise<void> {
+  await getPool().query(
+    `UPDATE sales SET delivered_at = now() WHERE stripe_session_id = $1`,
+    [stripeSessionId],
+  );
+}
+
 export async function recordEvent(
   type: string,
   payload: Record<string, unknown> = {},

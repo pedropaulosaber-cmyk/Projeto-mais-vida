@@ -9,6 +9,11 @@ CREATE TABLE IF NOT EXISTS sales (
   amount_cents INTEGER NOT NULL,
   currency TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'completed',
+  -- NULL até o acesso ao Drive + e-mail de entrega serem confirmados. Separado
+  -- do registro da venda em si para que uma falha de entrega (ex: Drive
+  -- indisponível) seja re-tentada nos reenvios do webhook, em vez de "sumir"
+  -- só porque a venda já foi gravada (ver app/api/webhook/route.ts).
+  delivered_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

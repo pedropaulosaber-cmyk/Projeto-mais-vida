@@ -93,3 +93,42 @@ export async function sendAdminLoginEmail(to: string, url: string): Promise<void
     html,
   });
 }
+
+/*
+ * Alerta para o suporte quando a entrega automática (Drive + e-mail) falha
+ * depois de um pagamento confirmado — sem isso, uma falha passa despercebida
+ * até o cliente reclamar. Best-effort: nunca deve travar a resposta ao
+ * webhook (o chamador envolve isto num try/catch próprio).
+ */
+export async function sendDeliveryFailureAlert(input: {
+  buyerEmail: string;
+  stripeSessionId: string;
+  errorMessage: string;
+}): Promise<void> {
+  const from = requireEnv("EMAIL_FROM");
+  const supportEmail = getEnv("SUPPORT_EMAIL") ?? from;
+
+  const html = `
+    <div style="font-family: Inter, Arial, sans-serif; max-width: 560px; margin: 0 auto; color: #1A1A1A;">
+      <h1 style="font-size: 18px; margin: 0 0 12px; color:#B42318;">⚠️ Falha ao entregar acesso após pagamento</h1>
+      <p style="font-size: 14px; line-height: 1.6; color: #4b4b4b;">
+        O pagamento da sessão <strong>${input.stripeSessionId}</strong>
+        (comprador: <strong>${input.buyerEmail}</strong>) foi confirmado, mas a
+        liberação automática do acesso (Google Drive e/ou e-mail) falhou.
+      </p>
+      <p style="font-size: 13px; line-height: 1.6; color: #6b7280;">
+        O Stripe vai reenviar este evento automaticamente e o sistema tenta a
+        entrega de novo a cada tentativa — mas se o erro persistir, libere o
+        acesso manualmente para este comprador.
+      </p>
+      <pre style="background:#f5f5f5;border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;word-break:break-all;">${input.errorMessage}</pre>
+    </div>
+  `.trim();
+
+  await getResend().emails.send({
+    from,
+    to: supportEmail,
+    subject: `⚠️ Falha na entrega — sessão ${input.stripeSessionId}`,
+    html,
+  });
+}
