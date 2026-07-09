@@ -10,13 +10,15 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      // 'unsafe-inline' em script/style é temporário para o esqueleto; será substituído
-      // por nonces/hashes quando o conteúdo real e os snippets de tracking forem adicionados.
-      "script-src 'self' 'unsafe-inline'",
+      // 'unsafe-inline' em script cobre o snippet inline do Meta Pixel;
+      // connect.facebook.net serve o fbevents.js.
+      "script-src 'self' 'unsafe-inline' https://connect.facebook.net",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      // O Pixel usa um <img> de tracking em facebook.com (fallback noscript).
+      "img-src 'self' data: blob: https://www.facebook.com",
       "font-src 'self' data:",
-      "connect-src 'self'",
+      // O Pixel envia eventos para facebook.com.
+      "connect-src 'self' https://www.facebook.com",
       "frame-src 'self'",
       "base-uri 'self'",
       "form-action 'self'",

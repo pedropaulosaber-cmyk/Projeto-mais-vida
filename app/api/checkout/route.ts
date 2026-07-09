@@ -17,6 +17,15 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
   ctaId: z.string().max(60).optional(),
+  // Sinais de tracking (skill conversion-tracking) repassados para o metadata da
+  // sessão, para o webhook correlacionar a venda à campanha (UTM) e disparar a
+  // Conversions API do Meta com bom match (fbp/fbc).
+  sessionId: z.string().max(64).optional(),
+  utmSource: z.string().max(120).optional(),
+  utmMedium: z.string().max(120).optional(),
+  utmCampaign: z.string().max(120).optional(),
+  fbp: z.string().max(120).optional(),
+  fbc: z.string().max(255).optional(),
 });
 
 function getClientIp(req: NextRequest): string {
@@ -56,13 +65,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let ctaId: string | undefined;
+  let tracking: z.infer<typeof bodySchema> = {};
   try {
     const json = await req.json().catch(() => ({}));
     const parsed = bodySchema.safeParse(json);
-    if (parsed.success) ctaId = parsed.data.ctaId;
+    if (parsed.success) tracking = parsed.data;
   } catch {
-    // corpo ausente/malformado é aceitável — ctaId é só metadado opcional
+    // corpo ausente/malformado é aceitável — os campos são metadados opcionais
   }
 
   const siteUrl = getBaseUrl(req);
@@ -72,13 +81,27 @@ export async function POST(req: NextRequest) {
   // reconhecível reduz chargeback do tipo "não reconheço essa cobrança".
   const statementDescriptor = getEnv("STRIPE_STATEMENT_DESCRIPTOR");
 
+  // Só entram no metadata os campos de tracking presentes (Stripe limita chaves
+  // e tamanho por valor; omitir vazios mantém enxuto).
+  const trackingMetadata: Record<string, string> = {};
+  if (tracking.sessionId) trackingMetadata.sid = tracking.sessionId;
+  if (tracking.utmSource) trackingMetadata.utm_source = tracking.utmSource;
+  if (tracking.utmMedium) trackingMetadata.utm_medium = tracking.utmMedium;
+  if (tracking.utmCampaign) trackingMetadata.utm_campaign = tracking.utmCampaign;
+  if (tracking.fbp) trackingMetadata.fbp = tracking.fbp;
+  if (tracking.fbc) trackingMetadata.fbc = tracking.fbc;
+
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
       line_items: [{ price: requireEnv("STRIPE_PRICE_ID"), quantity: 1 }],
       success_url: `${siteUrl}/obrigado?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: siteUrl,
-      metadata: { produto: PRODUCT_METADATA_VALUE, cta_id: ctaId ?? "" },
+      metadata: {
+        produto: PRODUCT_METADATA_VALUE,
+        cta_id: tracking.ctaId ?? "",
+        ...trackingMetadata,
+      },
       // A metadata da Checkout Session NÃO é copiada para o PaymentIntent/Charge.
       // Sem isso, o evento charge.dispute.created (webhook) não teria como saber
       // se a disputa é deste produto ou de outro na conta compartilhada.

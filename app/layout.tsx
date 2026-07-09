@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { MetaPixel } from "@/components/MetaPixel";
 
 // SEO base (skill: seo-content refina isto na etapa correspondente — title/description
 // finais, Open Graph, JSON-LD serão adicionados lá).
@@ -26,12 +27,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      {/*
-        Aqui entrarão os snippets client-side de tracking (GA4 / Meta Pixel) na
-        etapa da skill conversion-tracking — carregados via next/script, e a CSP
-        em next.config.mjs será ajustada para os domínios necessários.
-      */}
-      <body>{children}</body>
+      <body>
+        {/* Meta Pixel — só ativa se NEXT_PUBLIC_META_PIXEL_ID estiver definido. */}
+        <MetaPixel />
+        {children}
+      </body>
     </html>
   );
 }
