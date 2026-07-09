@@ -15,7 +15,13 @@ import { rateLimit } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 
 const bodySchema = z.object({
-  type: z.enum(["page_view", "view_item", "begin_checkout", "cta_click"]),
+  type: z.enum([
+    "page_view",
+    "view_item",
+    "begin_checkout",
+    "cta_click",
+    "time_on_page",
+  ]),
   sessionId: z.string().max(64).optional(),
   utmSource: z.string().max(120).optional(),
   utmMedium: z.string().max(120).optional(),

@@ -65,3 +65,31 @@ export async function sendDeliveryEmail({
     html,
   });
 }
+
+/** E-mail com o link de login do painel admin (magic link, prompt §9). */
+export async function sendAdminLoginEmail(to: string, url: string): Promise<void> {
+  const from = requireEnv("EMAIL_FROM");
+  const html = `
+    <div style="font-family: Inter, Arial, sans-serif; max-width: 520px; margin: 0 auto; color: #1A1A1A;">
+      <h1 style="font-size: 20px; margin: 0 0 12px;">Acesso ao painel DriveBooks</h1>
+      <p style="font-size: 14px; line-height: 1.6; color: #4b4b4b;">
+        Clique no botão abaixo para entrar. O link expira em 15 minutos e só
+        funciona uma vez. Se não foi você que pediu, ignore este e-mail.
+      </p>
+      <p style="margin: 22px 0;">
+        <a href="${url}" style="background:#FFC107;color:#1A1A1A;font-weight:800;
+          text-decoration:none;padding:12px 20px;border-radius:10px;display:inline-block;">
+          Entrar no painel
+        </a>
+      </p>
+      <p style="font-size: 12px; color: #9ca3af; word-break: break-all;">${url}</p>
+    </div>
+  `.trim();
+
+  await getResend().emails.send({
+    from,
+    to,
+    subject: "Seu link de acesso ao painel DriveBooks",
+    html,
+  });
+}

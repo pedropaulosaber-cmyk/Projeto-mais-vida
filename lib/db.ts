@@ -26,6 +26,18 @@ function getPool(): Pool {
   return _pool;
 }
 
+/**
+ * Consulta de leitura para o painel admin. Mantém o pool encapsulado (não
+ * exportamos o Pool) e sempre parametriza os valores para evitar injeção.
+ */
+export async function query<T = Record<string, unknown>>(
+  text: string,
+  params: unknown[] = [],
+): Promise<T[]> {
+  const result = await getPool().query(text, params);
+  return result.rows as T[];
+}
+
 export interface SaleRecord {
   stripeSessionId: string;
   buyerEmail: string;

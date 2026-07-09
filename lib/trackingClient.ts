@@ -36,6 +36,8 @@ function randomId(): string {
   );
 }
 
+let timeOnPageArmed = false;
+
 /** Chamar uma vez no carregamento da landing. Idempotente. */
 export function initTracking(): void {
   if (typeof window === "undefined") return;
@@ -56,6 +58,51 @@ export function initTracking(): void {
       sessionStorage.setItem(UTM_KEY, JSON.stringify(utm));
     }
   }
+
+  armTimeOnPage();
+}
+
+/*
+ * Mede o tempo de permanência na página e o envia UMA vez, quando a aba é
+ * escondida/fechada, via sendBeacon (sobrevive à navegação). Alimenta a métrica
+ * "tempo médio de permanência" do painel admin (prompt §9).
+ */
+function armTimeOnPage(): void {
+  if (timeOnPageArmed) return;
+  timeOnPageArmed = true;
+
+  const start = Date.now();
+  let sent = false;
+
+  const flush = () => {
+    if (sent) return;
+    sent = true;
+    const seconds = Math.round((Date.now() - start) / 1000);
+    if (seconds <= 0 || seconds > 3600) return;
+    const ctx = getTrackingContext();
+    const body = JSON.stringify({
+      type: "time_on_page",
+      sessionId: ctx.sessionId,
+      utmSource: ctx.utmSource,
+      utmMedium: ctx.utmMedium,
+      utmCampaign: ctx.utmCampaign,
+      path: ctx.path,
+      meta: { seconds },
+    });
+    try {
+      const blob = new Blob([body], { type: "application/json" });
+      if (!navigator.sendBeacon("/api/track", blob)) {
+        void fetch("/api/track", { method: "POST", body, keepalive: true, headers: { "Content-Type": "application/json" } });
+      }
+    } catch {
+      // best-effort
+    }
+  };
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flush();
+  });
+  window.addEventListener("pagehide", flush);
 }
 
 export function getTrackingContext(): TrackingContext {
