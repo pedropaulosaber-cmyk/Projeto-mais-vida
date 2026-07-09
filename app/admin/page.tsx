@@ -13,6 +13,7 @@ import {
   getOverview,
   getRecentSales,
 } from "@/lib/adminMetrics";
+import { AdminAutoRefresh } from "@/components/AdminAutoRefresh";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -93,12 +94,13 @@ export default async function AdminPage({
 
   return (
     <main style={S.main}>
+      <AdminAutoRefresh intervalMs={30_000} />
       <header style={S.header}>
         <div>
           <h1 style={S.h1}>Painel DriveBooks</h1>
           <p style={S.sub}>
             Logado como {session.email} · dados dos últimos{" "}
-            {PERIODS.find((p) => p.days === days)?.label}
+            {PERIODS.find((p) => p.days === days)?.label} · atualiza a cada 30s
           </p>
         </div>
         <form action="/api/admin/logout" method="post">
