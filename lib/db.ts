@@ -21,6 +21,20 @@ function getPool(): Pool {
       // O pooler do Supabase exige SSL; a CA não é verificável a partir de
       // funções serverless, então validamos a conexão (não o dado) sem checar a cadeia.
       ssl: { rejectUnauthorized: false },
+      // Ajustes para ambiente serverless (Vercel) + pooler do Supabase (porta
+      // 6543, modo transaction). Cada instância da função mantém no máximo
+      // poucas conexões e as solta rápido quando ociosas — sob pico de tráfego
+      // (ex: campanha paga) o gargalo passa a ser o pooler do Supabase, que é
+      // feito para isso, e não a soma de pools por instância esgotando o limite
+      // de conexões diretas do Postgres.
+      max: 3,
+      idleTimeoutMillis: 10_000,
+      // Falha rápido em vez de deixar a função pendurada se o banco não responder.
+      connectionTimeoutMillis: 10_000,
+    });
+    // Um erro num cliente ocioso do pool não pode derrubar o processo inteiro.
+    _pool.on("error", (err) => {
+      console.error("[db] erro em cliente ocioso do pool:", err);
     });
   }
   return _pool;
