@@ -67,6 +67,11 @@ export async function POST(req: NextRequest) {
 
   const siteUrl = getBaseUrl(req);
 
+  // Nome que aparece na fatura do cartão (skill fraud-prevention, Passo 3).
+  // Como a conta Stripe é compartilhada com outro produto, um descritor fixo e
+  // reconhecível reduz chargeback do tipo "não reconheço essa cobrança".
+  const statementDescriptor = getEnv("STRIPE_STATEMENT_DESCRIPTOR");
+
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
@@ -74,6 +79,15 @@ export async function POST(req: NextRequest) {
       success_url: `${siteUrl}/obrigado?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: siteUrl,
       metadata: { produto: PRODUCT_METADATA_VALUE, cta_id: ctaId ?? "" },
+      // A metadata da Checkout Session NÃO é copiada para o PaymentIntent/Charge.
+      // Sem isso, o evento charge.dispute.created (webhook) não teria como saber
+      // se a disputa é deste produto ou de outro na conta compartilhada.
+      payment_intent_data: {
+        metadata: { produto: PRODUCT_METADATA_VALUE },
+        ...(statementDescriptor
+          ? { statement_descriptor: statementDescriptor }
+          : {}),
+      },
     });
 
     if (!session.url) {
