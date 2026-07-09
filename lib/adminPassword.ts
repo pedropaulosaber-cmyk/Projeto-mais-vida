@@ -5,27 +5,14 @@
  * nunca no middleware edge — por isso fica separado de lib/adminAuth.ts.
  *
  * A senha nunca é guardada em texto puro: só o hash (scrypt + salt) vai para
- * ADMIN_PASSWORD_HASH, no formato "salt:hash" (hex).
+ * ADMIN_PASSWORD_HASH — ver lib/password.ts.
  */
 import "server-only";
-import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { requireEnv } from "./env";
+import { verifyPasswordHash } from "./password";
 
-export function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${hash}`;
-}
+export { hashPassword } from "./password";
 
 export function verifyPassword(password: string): boolean {
-  // .trim() por segurança: é comum sobrar um espaço/quebra de linha ao colar
-  // o valor no painel da Vercel, o que faria a comparação falhar silenciosamente.
-  const stored = requireEnv("ADMIN_PASSWORD_HASH").trim();
-  const [salt, hash] = stored.split(":").map((part) => part.trim());
-  if (!salt || !hash) return false;
-
-  const candidate = scryptSync(password, salt, 64);
-  const expected = Buffer.from(hash, "hex");
-  if (candidate.length !== expected.length) return false;
-  return timingSafeEqual(candidate, expected);
+  return verifyPasswordHash(password, requireEnv("ADMIN_PASSWORD_HASH"));
 }

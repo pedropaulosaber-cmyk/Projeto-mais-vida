@@ -73,6 +73,16 @@ export function LandingClient() {
             fbc: ctx.fbc,
           }),
         });
+
+        // Login obrigatório antes da compra: sem sessão de cliente válida, o
+        // servidor recusa criar o checkout — manda para /entrar e, ao logar,
+        // a compra é retomada automaticamente (ver app/entrar/page.tsx).
+        if (res.status === 401) {
+          const data: { redirect?: string } = await res.json().catch(() => ({}));
+          window.location.href = data.redirect ?? "/entrar?next=checkout";
+          return;
+        }
+
         if (!res.ok) throw new Error("checkout-indisponivel");
         const data: { url?: string } = await res.json();
         if (data.url) {

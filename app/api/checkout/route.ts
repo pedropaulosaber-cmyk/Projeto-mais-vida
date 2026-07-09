@@ -4,6 +4,7 @@ import { getStripe } from "@/lib/stripe";
 import { requireEnv, getEnv } from "@/lib/env";
 import { rateLimit } from "@/lib/rate-limit";
 import { PRODUCT_METADATA_VALUE } from "@/lib/product";
+import { USER_COOKIE, verifyUserSessionToken } from "@/lib/userAuth";
 
 /*
  * POST /api/checkout (skill stripe-drive-checkout, Passo 2).
@@ -65,6 +66,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Login obrigatório antes da compra (a pedido do usuário): sem sessão de
+  // cliente válida, não criamos a sessão de checkout.
+  const userToken = req.cookies.get(USER_COOKIE)?.value;
+  const userSession = userToken ? await verifyUserSessionToken(userToken) : null;
+  if (!userSession) {
+    return NextResponse.json(
+      { error: "login_required", redirect: "/entrar?next=checkout" },
+      { status: 401 },
+    );
+  }
+
   let tracking: z.infer<typeof bodySchema> = {};
   try {
     const json = await req.json().catch(() => ({}));
@@ -95,6 +107,9 @@ export async function POST(req: NextRequest) {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
       line_items: [{ price: requireEnv("STRIPE_PRICE_ID"), quantity: 1 }],
+      // Pré-preenche com o e-mail da conta logada — evita perguntar de novo e
+      // garante que o acesso ao Drive vá para o e-mail da conta do cliente.
+      customer_email: userSession.email,
       success_url: `${siteUrl}/obrigado?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: siteUrl,
       metadata: {
