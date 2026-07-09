@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { requireEnv } from "@/lib/env";
-import { recordSaleIdempotent, recordEvent } from "@/lib/db";
+import { recordSaleIdempotent, recordEvent, isDelivered, markDelivered } from "@/lib/db";
 import { grantFolderAccess, revokeFolderAccess } from "@/lib/drive";
-import { sendDeliveryEmail } from "@/lib/email";
+import { sendDeliveryEmail, sendDeliveryFailureAlert } from "@/lib/email";
 import { formatBRL } from "@/lib/format";
 import { PRODUCT_METADATA_VALUE } from "@/lib/product";
 import { sendMetaPurchase } from "@/lib/meta";
@@ -71,17 +71,9 @@ export async function POST(req: NextRequest) {
     });
 
     if (isNewSale) {
-      // Efeitos colaterais só rodam na PRIMEIRA vez que este evento é processado
-      // (o Stripe pode reenviar o mesmo evento — sem isso duplicaríamos o
-      // convite do Drive e o e-mail de entrega).
-      await grantFolderAccess(buyerEmail);
-      await sendDeliveryEmail({
-        to: buyerEmail,
-        amountPaidFormatted: formatBRL(amountCents),
-      });
-
-      // Conversão real, server-side (skill conversion-tracking, Passo 4). O
-      // event_id = session.id deixa o Meta deduplicar reenvios do webhook.
+      // Analytics/atribuição da venda: roda só na PRIMEIRA vez que este evento
+      // é processado (o Stripe pode reenviar), independente do resultado da
+      // entrega abaixo — a venda aconteceu de qualquer forma.
       await sendMetaPurchase({
         eventId: session.id,
         email: buyerEmail,
@@ -102,10 +94,40 @@ export async function POST(req: NextRequest) {
         amountCents,
         currency,
       }).catch((err) => {
-        // Registro de evento é só para o painel admin — falha aqui não deve
-        // impedir a resposta 200 ao Stripe (o acesso já foi liberado).
+        // Registro de evento é só para o painel admin — não deve impedir a
+        // entrega nem a resposta ao Stripe.
         console.error("[webhook] falha ao registrar evento purchase:", err);
       });
+    }
+
+    // Entrega (Drive + e-mail) fica SEPARADA da idempotência da venda de
+    // propósito: se falhar aqui, respondemos 500 para o Stripe reenviar o
+    // evento — e, como `delivered_at` só é marcado no sucesso, a próxima
+    // tentativa tenta a entrega de novo (não fica "presa" só porque a venda
+    // já estava gravada).
+    const alreadyDelivered = await isDelivered(session.id);
+    if (!alreadyDelivered) {
+      try {
+        await grantFolderAccess(buyerEmail);
+        await sendDeliveryEmail({
+          to: buyerEmail,
+          amountPaidFormatted: formatBRL(amountCents),
+        });
+        await markDelivered(session.id);
+      } catch (err) {
+        console.error("[webhook] falha ao entregar acesso:", session.id, err);
+        await sendDeliveryFailureAlert({
+          buyerEmail,
+          stripeSessionId: session.id,
+          errorMessage: err instanceof Error ? err.message : String(err),
+        }).catch((alertErr) => {
+          console.error("[webhook] falha ao enviar alerta de entrega:", alertErr);
+        });
+        return NextResponse.json(
+          { error: "Falha na entrega. O Stripe vai tentar novamente." },
+          { status: 500 },
+        );
+      }
     }
   }
 
