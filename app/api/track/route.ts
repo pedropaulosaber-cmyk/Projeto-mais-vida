@@ -21,6 +21,7 @@ const bodySchema = z.object({
     "begin_checkout",
     "cta_click",
     "time_on_page",
+    "heartbeat",
   ]),
   sessionId: z.string().max(64).optional(),
   utmSource: z.string().max(120).optional(),
