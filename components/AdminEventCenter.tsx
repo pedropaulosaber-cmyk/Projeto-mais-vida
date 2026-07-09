@@ -99,7 +99,10 @@ export function AdminEventCenter() {
         <span style={{ ...S.sectionBar, background: "#A78BFA" }} />
         <div>
           <h2 style={S.sectionTitle}>Central de eventos</h2>
-          <p style={S.sectionSubtitle}>Ao vivo — atualiza a cada 5s</p>
+          <p style={S.sectionSubtitle}>
+            Eventos de hoje · ao vivo, atualiza a cada 5s
+            {data ? ` · ${data.events.length} evento${data.events.length === 1 ? "" : "s"}` : ""}
+          </p>
         </div>
       </div>
 
@@ -171,7 +174,7 @@ const S: Record<string, React.CSSProperties> = {
     border: "1px solid #232323",
     borderRadius: 14,
     padding: "6px 18px",
-    maxHeight: 360,
+    maxHeight: 620,
     overflowY: "auto",
   },
   feedRow: {

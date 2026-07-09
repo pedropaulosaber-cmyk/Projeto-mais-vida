@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const [liveVisitors, events] = await Promise.all([
     getLiveVisitorsCount(),
-    getRecentEvents(40),
+    getRecentEvents(300),
   ]);
 
   return NextResponse.json({ liveVisitors, events });
