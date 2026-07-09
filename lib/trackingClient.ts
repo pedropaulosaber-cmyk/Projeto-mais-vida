@@ -36,7 +36,7 @@ function randomId(): string {
   );
 }
 
-let timeOnPageArmed = false;
+let engagementArmed = false;
 
 /** Chamar uma vez no carregamento da landing. Idempotente. */
 export function initTracking(): void {
@@ -59,20 +59,42 @@ export function initTracking(): void {
     }
   }
 
-  armTimeOnPage();
+  armEngagement();
 }
 
 /*
- * Mede o tempo de permanência na página e o envia UMA vez, quando a aba é
- * escondida/fechada, via sendBeacon (sobrevive à navegação). Alimenta a métrica
- * "tempo médio de permanência" do painel admin (prompt §9).
+ * Mede tempo de permanência e profundidade de rolagem, enviados juntos UMA vez
+ * quando a aba é escondida/fechada, via sendBeacon (sobrevive à navegação).
+ * Alimentam as seções "Visitas" e "Rolagem" do painel admin.
  */
-function armTimeOnPage(): void {
-  if (timeOnPageArmed) return;
-  timeOnPageArmed = true;
+function armEngagement(): void {
+  if (engagementArmed) return;
+  engagementArmed = true;
 
   const start = Date.now();
+  let maxScrollPercent = 0;
   let sent = false;
+
+  function currentScrollPercent(): number {
+    const doc = document.documentElement;
+    const scrollable = doc.scrollHeight - window.innerHeight;
+    if (scrollable <= 0) return 100;
+    return Math.min(100, Math.round(((window.scrollY || doc.scrollTop) / scrollable) * 100));
+  }
+
+  let scrollTicking = false;
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (scrollTicking) return;
+      scrollTicking = true;
+      requestAnimationFrame(() => {
+        maxScrollPercent = Math.max(maxScrollPercent, currentScrollPercent());
+        scrollTicking = false;
+      });
+    },
+    { passive: true },
+  );
 
   const flush = () => {
     if (sent) return;
@@ -87,7 +109,7 @@ function armTimeOnPage(): void {
       utmMedium: ctx.utmMedium,
       utmCampaign: ctx.utmCampaign,
       path: ctx.path,
-      meta: { seconds },
+      meta: { seconds, scrollPercent: maxScrollPercent },
     });
     try {
       const blob = new Blob([body], { type: "application/json" });
