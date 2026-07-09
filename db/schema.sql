@@ -26,3 +26,12 @@ CREATE TABLE IF NOT EXISTS events (
 
 CREATE INDEX IF NOT EXISTS idx_events_type_created_at ON events (type, created_at);
 CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales (created_at);
+
+-- Contas de cliente (login obrigatório antes da compra, a pedido do usuário).
+-- Senha nunca em texto puro — só o hash (scrypt + salt), ver lib/password.ts.
+CREATE TABLE IF NOT EXISTS users (
+  id BIGSERIAL PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
