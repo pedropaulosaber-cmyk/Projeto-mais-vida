@@ -82,6 +82,23 @@ async function verifyToken(
   }
 }
 
+/*
+ * Link direto (menos seguro que o magic link): uma chave estática, sem
+ * expiração, guardada em ADMIN_DIRECT_LINK_SECRET. Quem tiver o link inteiro
+ * entra direto no painel, sem passar pelo e-mail. Existe por conveniência —
+ * o magic link continua disponível e é a opção mais segura.
+ */
+export function verifyDirectLinkSecret(key: string): boolean {
+  const secret = getEnvSafe("ADMIN_DIRECT_LINK_SECRET");
+  if (!secret || !key) return false;
+  return safeEqual(key, secret);
+}
+
+function getEnvSafe(name: string): string | undefined {
+  const value = process.env[name];
+  return value && value.length > 0 ? value : undefined;
+}
+
 export function isAllowedEmail(email: string): boolean {
   const allowed = (requireEnv("ADMIN_ALLOWED_EMAILS") || "")
     .split(",")

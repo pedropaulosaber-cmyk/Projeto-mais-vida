@@ -1,12 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+
+const ERROR_MESSAGES: Record<string, string> = {
+  link: "Link inválido ou expirado.",
+  tentativas: "Muitas tentativas. Aguarde um instante e tente de novo.",
+};
 
 /* Tela de login do painel admin — pede o e-mail e dispara o magic link. */
 export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminLoginForm />
+    </Suspense>
+  );
+}
+
+function AdminLoginForm() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const erro = searchParams.get("erro");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +65,20 @@ export default function AdminLoginPage() {
         <h1 style={{ fontFamily: "Poppins, sans-serif", fontSize: 20, margin: "0 0 6px" }}>
           Painel DriveBooks
         </h1>
+        {erro && ERROR_MESSAGES[erro] && (
+          <p
+            style={{
+              background: "#FDECEC",
+              color: "#B42318",
+              fontSize: 13,
+              padding: "10px 12px",
+              borderRadius: 8,
+              margin: "0 0 14px",
+            }}
+          >
+            {ERROR_MESSAGES[erro]}
+          </p>
+        )}
         {sent ? (
           <p style={{ color: "#4b4b4b", lineHeight: 1.6, fontSize: 14 }}>
             Se este e-mail tiver acesso, enviamos um link de login para ele.
