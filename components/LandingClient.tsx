@@ -89,7 +89,54 @@ export function LandingClient() {
     }
 
     root.addEventListener("click", handleClick);
-    return () => root.removeEventListener("click", handleClick);
+
+    // Carrossel "Uma amostra do acervo": desliza o dedo/mouse por cima para
+    // acelerar a animação temporariamente — some volta à velocidade normal
+    // um instante depois que o toque para.
+    const tracks = Array.from(
+      root.querySelectorAll<HTMLElement>("[data-carousel-track]"),
+    );
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    const boostTimers = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
+    const boostCleanups: (() => void)[] = [];
+
+    if (!prefersReducedMotion) {
+      const BOOST_DURATION = "6s";
+      const COOLDOWN_MS = 800;
+
+      tracks.forEach((el) => {
+        const zone = el.parentElement ?? el; // wrapper com overflow:hidden, área visível do carrossel
+        const boost = () => {
+          el.style.animationDuration = BOOST_DURATION;
+          const existing = boostTimers.get(el);
+          if (existing) clearTimeout(existing);
+          boostTimers.set(
+            el,
+            setTimeout(() => {
+              el.style.animationDuration = el.dataset.duration ?? "";
+              boostTimers.delete(el);
+            }, COOLDOWN_MS),
+          );
+        };
+        zone.addEventListener("touchstart", boost, { passive: true });
+        zone.addEventListener("touchmove", boost, { passive: true });
+        zone.addEventListener("pointerdown", boost);
+        boostCleanups.push(() => {
+          zone.removeEventListener("touchstart", boost);
+          zone.removeEventListener("touchmove", boost);
+          zone.removeEventListener("pointerdown", boost);
+        });
+      });
+    }
+
+    return () => {
+      root.removeEventListener("click", handleClick);
+      boostCleanups.forEach((fn) => fn());
+      boostTimers.forEach((t) => clearTimeout(t));
+    };
   }, []);
 
   /*
