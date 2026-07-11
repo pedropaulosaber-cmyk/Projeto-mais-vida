@@ -6,13 +6,6 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-/*
- * ATENÇÃO: o campo de identificação do vendedor abaixo está com placeholder
- * (o usuário ainda não definiu se vende como pessoa física ou CNPJ). O CDC
- * (art. 31) exige essa identificação clara — preencher antes de escalar.
- */
-const SELLER_IDENTIFICATION =
-  "[a preencher: nome completo ou razão social do vendedor responsável pela DriveBooks]";
 const SUPPORT_EMAIL = "adminebook.16@gmail.com";
 
 export default function TermosPage() {
@@ -20,10 +13,11 @@ export default function TermosPage() {
     <LegalPageLayout title="Termos de Uso" updatedAt="9 de julho de 2026">
       <LegalSection title="1. Quem somos">
         <p>
-          A DriveBooks é um produto digital operado por {SELLER_IDENTIFICATION}
-          ("nós"), que disponibiliza acesso a uma biblioteca de livros digitais
-          através de uma pasta compartilhada do Google Drive. Dúvidas ou
-          contato: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+          A DriveBooks ("nós") é um produto digital que disponibiliza acesso a
+          uma biblioteca de livros digitais através de uma pasta compartilhada
+          do Google Drive. Para dúvidas, suporte ou qualquer solicitação, fale
+          com a gente em{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
         </p>
       </LegalSection>
 

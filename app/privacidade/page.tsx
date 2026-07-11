@@ -6,8 +6,6 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const SELLER_IDENTIFICATION =
-  "[a preencher: nome completo ou razão social do vendedor responsável pela DriveBooks]";
 const SUPPORT_EMAIL = "adminebook.16@gmail.com";
 
 export default function PrivacidadePage() {
@@ -15,10 +13,10 @@ export default function PrivacidadePage() {
     <LegalPageLayout title="Política de Privacidade" updatedAt="9 de julho de 2026">
       <LegalSection title="1. Quem trata seus dados">
         <p>
-          Esta política explica como a DriveBooks, operada por{" "}
-          {SELLER_IDENTIFICATION} ("controlador"), coleta, usa e protege seus
+          Esta política explica como a DriveBooks coleta, usa e protege seus
           dados pessoais, em conformidade com a Lei Geral de Proteção de Dados
-          (LGPD — Lei nº 13.709/2018). Contato do controlador:{" "}
+          (LGPD — Lei nº 13.709/2018). Para exercer seus direitos ou tirar
+          dúvidas sobre o tratamento dos seus dados, entre em contato pelo{" "}
           <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
         </p>
       </LegalSection>
