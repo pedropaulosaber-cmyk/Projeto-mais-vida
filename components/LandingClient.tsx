@@ -146,6 +146,32 @@ export function LandingClient() {
   const ref = useRef<HTMLDivElement>(null);
   const [pendingCta, setPendingCta] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
+  // Sessão de checkout iniciada assim que o modal abre, para o clique em
+  // "Continuar" redirecionar quase instantâneo (a criação da sessão no Stripe
+  // já está em andamento em segundo plano).
+  const prefetchRef = useRef<{ ctaId: string; promise: Promise<string | null> } | null>(null);
+
+  // Cria a Checkout Session no servidor e devolve a URL (ou null em falha).
+  // Não dispara tracking nem redireciona — só obtém a URL.
+  function requestCheckoutUrl(ctaId: string): Promise<string | null> {
+    const ctx = getTrackingContext();
+    return fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ctaId,
+        sessionId: ctx.sessionId,
+        utmSource: ctx.utmSource,
+        utmMedium: ctx.utmMedium,
+        utmCampaign: ctx.utmCampaign,
+        fbp: ctx.fbp,
+        fbc: ctx.fbc,
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { url?: string } | null) => data?.url ?? null)
+      .catch(() => null);
+  }
 
   async function proceedToCheckout(ctaId: string) {
     setRedirecting(true);
@@ -155,42 +181,30 @@ export function LandingClient() {
     void track("begin_checkout");
     trackPixel("InitiateCheckout", { value: CHECKOUT_VALUE, currency: "BRL" });
 
-    const ctx = getTrackingContext();
-
     const externalUrl = process.env.NEXT_PUBLIC_CHECKOUT_URL;
     if (externalUrl) {
       window.location.href = externalUrl;
       return;
     }
 
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ctaId,
-          sessionId: ctx.sessionId,
-          utmSource: ctx.utmSource,
-          utmMedium: ctx.utmMedium,
-          utmCampaign: ctx.utmCampaign,
-          fbp: ctx.fbp,
-          fbc: ctx.fbc,
-        }),
-      });
-      if (!res.ok) throw new Error("checkout-indisponivel");
-      const data: { url?: string } = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      throw new Error("sem-url");
-    } catch {
-      setRedirecting(false);
-      window.alert(
-        "O checkout ainda será ativado. Configure NEXT_PUBLIC_CHECKOUT_URL " +
-          "(link de pagamento) ou finalize a etapa do Stripe para concluir a compra.",
-      );
+    // Reaproveita a sessão pré-criada quando o modal abriu; se não houver
+    // (ou for de outro CTA), cria agora.
+    const pending =
+      prefetchRef.current && prefetchRef.current.ctaId === ctaId
+        ? prefetchRef.current.promise
+        : requestCheckoutUrl(ctaId);
+
+    const url = await pending;
+    if (url) {
+      window.location.href = url;
+      return;
     }
+
+    setRedirecting(false);
+    prefetchRef.current = null;
+    window.alert(
+      "Não foi possível iniciar o checkout agora. Tente novamente em instantes.",
+    );
   }
 
   useEffect(() => {
@@ -209,6 +223,10 @@ export function LandingClient() {
       e.preventDefault();
       const ctaId = (link.textContent || "cta").trim().slice(0, 40);
       setPendingCta(ctaId);
+      // Começa a criar a sessão do Stripe já, em paralelo ao aviso do modal.
+      if (!process.env.NEXT_PUBLIC_CHECKOUT_URL) {
+        prefetchRef.current = { ctaId, promise: requestCheckoutUrl(ctaId) };
+      }
     }
 
     root.addEventListener("click", handleClick);
