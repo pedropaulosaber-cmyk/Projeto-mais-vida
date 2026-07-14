@@ -144,11 +144,11 @@ function setupCarousels(root: HTMLElement): () => void {
  */
 export function LandingClient() {
   const ref = useRef<HTMLDivElement>(null);
-  const [pendingCta, setPendingCta] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
-  // Sessão de checkout iniciada assim que o modal abre, para o clique em
-  // "Continuar" redirecionar quase instantâneo (a criação da sessão no Stripe
-  // já está em andamento em segundo plano).
+  // Guarda síncrono contra clique duplo (o estado do React pode estar "atrasado").
+  const redirectingRef = useRef(false);
+  // Sessão de checkout iniciada já no toque/mouse-down do CTA (antes do clique),
+  // para o redirecionamento ao Stripe ser praticamente instantâneo.
   const prefetchRef = useRef<{ ctaId: string; promise: Promise<string | null> } | null>(null);
 
   // Cria a Checkout Session no servidor e devolve a URL (ou null em falha).
@@ -174,6 +174,8 @@ export function LandingClient() {
   }
 
   async function proceedToCheckout(ctaId: string) {
+    if (redirectingRef.current) return;
+    redirectingRef.current = true;
     setRedirecting(true);
 
     // Eventos de funil: no nosso banco (painel admin) + no Meta Pixel.
@@ -187,8 +189,8 @@ export function LandingClient() {
       return;
     }
 
-    // Reaproveita a sessão pré-criada quando o modal abriu; se não houver
-    // (ou for de outro CTA), cria agora.
+    // Reaproveita a sessão pré-criada no toque; se não houver (ou for de outro
+    // CTA), cria agora.
     const pending =
       prefetchRef.current && prefetchRef.current.ctaId === ctaId
         ? prefetchRef.current.promise
@@ -200,6 +202,7 @@ export function LandingClient() {
       return;
     }
 
+    redirectingRef.current = false;
     setRedirecting(false);
     prefetchRef.current = null;
     window.alert(
@@ -215,25 +218,38 @@ export function LandingClient() {
     const root = ref.current;
     if (!root) return;
 
-    function handleClick(e: MouseEvent) {
+    function ctaFrom(e: Event): HTMLAnchorElement | null {
       const target = e.target as HTMLElement | null;
-      const link = target?.closest<HTMLAnchorElement>('a[href="#CHECKOUT_LINK"]');
-      if (!link) return;
+      return target?.closest<HTMLAnchorElement>('a[href="#CHECKOUT_LINK"]') ?? null;
+    }
 
-      e.preventDefault();
+    // No mouse-down/toque, começa a criar a sessão do Stripe (antes do clique),
+    // para o clique redirecionar quase instantâneo.
+    function handlePointerDown(e: Event) {
+      const link = ctaFrom(e);
+      if (!link || process.env.NEXT_PUBLIC_CHECKOUT_URL) return;
       const ctaId = (link.textContent || "cta").trim().slice(0, 40);
-      setPendingCta(ctaId);
-      // Começa a criar a sessão do Stripe já, em paralelo ao aviso do modal.
-      if (!process.env.NEXT_PUBLIC_CHECKOUT_URL) {
+      if (prefetchRef.current?.ctaId !== ctaId) {
         prefetchRef.current = { ctaId, promise: requestCheckoutUrl(ctaId) };
       }
     }
 
+    // No clique, vai direto para o checkout (sem nenhum aviso/modal no meio).
+    function handleClick(e: MouseEvent) {
+      const link = ctaFrom(e);
+      if (!link) return;
+      e.preventDefault();
+      const ctaId = (link.textContent || "cta").trim().slice(0, 40);
+      void proceedToCheckout(ctaId);
+    }
+
+    root.addEventListener("pointerdown", handlePointerDown);
     root.addEventListener("click", handleClick);
 
     const carouselCleanup = setupCarousels(root);
 
     return () => {
+      root.removeEventListener("pointerdown", handlePointerDown);
       root.removeEventListener("click", handleClick);
       carouselCleanup();
     };
@@ -250,39 +266,10 @@ export function LandingClient() {
       <div className="dc-mobile" dangerouslySetInnerHTML={{ __html: LANDING_HTML }} />
       <div className="dc-desktop" dangerouslySetInnerHTML={{ __html: LANDING_HTML_DESKTOP }} />
 
-      {pendingCta !== null && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="email-notice-title"
-          style={S.overlay}
-          onClick={() => !redirecting && setPendingCta(null)}
-        >
-          <div style={S.card} onClick={(e) => e.stopPropagation()}>
-            <h2 id="email-notice-title" style={S.title}>
-              💡 Dica rápida
-            </h2>
-            <p style={S.text}>
-              No próximo passo, use o e-mail onde você quer receber seu
-              acesso — é para ele que enviamos o link do Drive.
-            </p>
-            <button
-              type="button"
-              style={S.confirmBtn}
-              disabled={redirecting}
-              onClick={() => proceedToCheckout(pendingCta)}
-            >
-              {redirecting ? "Redirecionando…" : "Continuar"}
-            </button>
-            <button
-              type="button"
-              style={S.cancelBtn}
-              disabled={redirecting}
-              onClick={() => setPendingCta(null)}
-            >
-              Cancelar
-            </button>
-          </div>
+      {/* Spinner leve enquanto a sessão do Stripe é criada e o redirect acontece. */}
+      {redirecting && (
+        <div style={S.overlay} aria-live="polite" aria-busy="true">
+          <div style={S.spinner} />
         </div>
       )}
     </div>
@@ -293,59 +280,19 @@ const S: Record<string, React.CSSProperties> = {
   overlay: {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,.45)",
+    background: "rgba(255,255,255,.6)",
+    backdropFilter: "blur(2px)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
     zIndex: 1000,
   },
-  card: {
-    width: "100%",
-    maxWidth: 300,
-    background: "#fff",
-    borderRadius: 16,
-    padding: "20px 18px",
-    textAlign: "center",
-    boxShadow: "0 20px 50px -20px rgba(0,0,0,.4)",
-  },
-  title: {
-    fontFamily: "Poppins, sans-serif",
-    fontSize: 15,
-    fontWeight: 700,
-    color: "#1A1A1A",
-    margin: "0 0 8px",
-  },
-  text: {
-    fontFamily: "Inter, sans-serif",
-    fontSize: 13,
-    lineHeight: 1.5,
-    color: "#4b4b4b",
-    margin: "0 0 16px",
-  },
-  confirmBtn: {
-    display: "block",
-    width: "100%",
-    background: "#FFC107",
-    color: "#1A1A1A",
-    fontFamily: "Poppins, sans-serif",
-    fontWeight: 700,
-    fontSize: 14,
-    border: "none",
-    borderRadius: 10,
-    padding: "12px",
-    cursor: "pointer",
-    marginBottom: 10,
-  },
-  cancelBtn: {
-    display: "block",
-    width: "100%",
-    background: "transparent",
-    color: "#6b7280",
-    fontFamily: "Inter, sans-serif",
-    fontSize: 13,
-    border: "none",
-    padding: "6px",
-    cursor: "pointer",
+  spinner: {
+    width: 44,
+    height: 44,
+    borderRadius: "50%",
+    border: "4px solid #FFE9A6",
+    borderTopColor: "#FFC107",
+    animation: "dbk-spin .8s linear infinite",
   },
 };

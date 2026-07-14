@@ -365,6 +365,9 @@ body{margin:0;background:#e9e7e2;font-family:Inter,system-ui,sans-serif;color:#1
 a{color:#1A1A1A}
 img{display:block;max-width:100%}
 @keyframes ctapulse{0%,100%{transform:scale(1);box-shadow:0 10px 26px -10px rgba(255,193,7,.9)}50%{transform:scale(1.03);box-shadow:0 14px 32px -8px rgba(255,193,7,1)}}
+@keyframes dbk-spin{to{transform:rotate(360deg)}}
+@keyframes promopulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,193,7,.55)}50%{transform:scale(1.02);box-shadow:0 0 0 10px rgba(255,193,7,0)}}
+.promo-pulse{animation:promopulse 1.8s ease-in-out infinite}
 .cta{animation:ctapulse 2.4s ease-in-out infinite}
 .cta:active{filter:brightness(.94)}
 details>summary{list-style:none;cursor:pointer}
@@ -372,7 +375,7 @@ details>summary::-webkit-details-marker{display:none}
 details[open] .faq-chev{transform:rotate(45deg)}
 .mwrap{max-width:760px;margin:0 auto;background:#fff;min-height:100vh;box-shadow:0 0 60px -20px rgba(0,0,0,.25);position:relative;overflow:hidden}
 .blkcta{max-width:480px;margin-left:auto;margin-right:auto}
-@media (prefers-reduced-motion: reduce){.cta{animation:none!important}}
+@media (prefers-reduced-motion: reduce){.cta,.promo-pulse{animation:none!important}}
 
 /* Barra de progresso do carrossel "Uma amostra do acervo" (arrastável, ver
    components/LandingClient.tsx — o carrossel em si é animado via JS/rAF, não
