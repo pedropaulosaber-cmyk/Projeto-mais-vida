@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-/* Botão simples de copiar o link do Drive na página de obrigado. */
+/* Botão de copiar o link do Drive na página de obrigado (pós-compra). */
 export function CopyLinkButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -22,17 +22,20 @@ export function CopyLinkButton({ url }: { url: string }) {
       type="button"
       onClick={handleCopy}
       style={{
-        border: "1px solid #e5e5e5",
-        borderRadius: 8,
-        padding: "8px 14px",
-        fontSize: 13,
+        width: "100%",
+        border: "1.5px solid #1A1A1A",
+        borderRadius: 12,
+        padding: "14px",
+        fontSize: 15,
         fontWeight: 700,
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: "Poppins, Inter, system-ui, sans-serif",
+        color: "#1A1A1A",
         background: copied ? "#FFF6D6" : "#fff",
         cursor: "pointer",
+        transition: "background .15s ease",
       }}
     >
-      {copied ? "Copiado!" : "Copiar link"}
+      {copied ? "✓ Link copiado!" : "Copiar link do Drive"}
     </button>
   );
 }
