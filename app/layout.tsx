@@ -5,9 +5,9 @@ import { MetaPixel } from "@/components/MetaPixel";
 // SEO base (skill: seo-content refina isto na etapa correspondente — title/description
 // finais, Open Graph, JSON-LD serão adicionados lá).
 export const metadata: Metadata = {
-  title: "DriveBooks — +1.500 livros digitais por R$ 39,90",
+  title: "DriveBooks — +1.500 livros digitais por R$ 24,90",
   description:
-    "Uma biblioteca completa com mais de 1.500 livros digitais via Google Drive. Acesso vitalício, entrega imediata e leitura em qualquer dispositivo — pagamento único de R$ 39,90.",
+    "Uma biblioteca completa com mais de 1.500 livros digitais via Google Drive. Acesso vitalício, entrega imediata e leitura em qualquer dispositivo — pagamento único de R$ 24,90.",
   metadataBase: process.env.NEXT_PUBLIC_SITE_URL
     ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
     : undefined,

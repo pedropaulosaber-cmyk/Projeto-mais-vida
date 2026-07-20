@@ -1,19 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { requireEnv, getEnv } from "@/lib/env";
 import { rateLimit } from "@/lib/rate-limit";
-import { PRODUCT_METADATA_VALUE } from "@/lib/product";
+import { PRODUCT_METADATA_VALUE, getPriceCents } from "@/lib/product";
 
 /*
  * POST /api/checkout (skill stripe-drive-checkout, Passo 2).
  *
  * Cria a Stripe Checkout Session server-side e devolve { url } para o
- * frontend redirecionar (window.location = url). O preço vem SEMPRE de
- * STRIPE_PRICE_ID — nunca hardcoded aqui nem no client, para não haver dois
- * lugares de verdade sobre quanto custa o produto.
+ * frontend redirecionar (window.location = url). O VALOR cobrado é definido no
+ * código (lib/product.ts#getPriceCents, com override via env PRICE_CENTS) e
+ * montado com price_data, referenciando o PRODUTO existente no Stripe para
+ * preservar nome/imagem na tela de pagamento. Assim, mudar o preço é só um
+ * deploy — sem criar um novo Price no painel do Stripe.
  */
 export const runtime = "nodejs";
+
+/*
+ * ID do produto no Stripe. Preferimos STRIPE_PRODUCT_ID (se definido); senão,
+ * derivamos do STRIPE_PRICE_ID existente (buscamos o Price uma vez e usamos o
+ * produto dele). Cacheado em memória para não repetir a chamada a cada checkout.
+ */
+let _productIdCache: string | null = null;
+async function resolveProductId(stripe: Stripe): Promise<string> {
+  const explicit = getEnv("STRIPE_PRODUCT_ID");
+  if (explicit) return explicit;
+  if (_productIdCache) return _productIdCache;
+
+  const price = await stripe.prices.retrieve(requireEnv("STRIPE_PRICE_ID"));
+  const product =
+    typeof price.product === "string" ? price.product : price.product.id;
+  _productIdCache = product;
+  return product;
+}
 
 const bodySchema = z.object({
   ctaId: z.string().max(60).optional(),
@@ -92,9 +113,21 @@ export async function POST(req: NextRequest) {
   if (tracking.fbc) trackingMetadata.fbc = tracking.fbc;
 
   try {
-    const session = await getStripe().checkout.sessions.create({
+    const stripe = getStripe();
+    const productId = await resolveProductId(stripe);
+
+    const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [{ price: requireEnv("STRIPE_PRICE_ID"), quantity: 1 }],
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "brl",
+            product: productId,
+            unit_amount: getPriceCents(),
+          },
+        },
+      ],
       success_url: `${siteUrl}/obrigado?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: siteUrl,
       metadata: {

@@ -10,8 +10,9 @@ import {
   trackPixel,
 } from "@/lib/trackingClient";
 
-// Preço só para os eventos de tracking (o valor cobrado de verdade vem do Stripe).
-const CHECKOUT_VALUE = 39.9;
+// Preço só para os eventos de tracking (o valor cobrado de verdade é definido
+// no servidor — lib/product.ts#getPriceCents). Manter alinhado ao preço real.
+const CHECKOUT_VALUE = 24.9;
 
 // Velocidade de fluxo automático do carrossel "Uma amostra do acervo", em px/s.
 const CAROUSEL_SPEED_PX_S = 75;
