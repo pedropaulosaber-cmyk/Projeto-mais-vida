@@ -311,11 +311,15 @@ export function LandingClient() {
             >
               ×
             </button>
-            <div style={S.popupEmoji}>📚</div>
+            <div style={S.popupBadge}>🔥 OFERTA POR TEMPO LIMITADO</div>
             <h2 id="popup-title" style={S.popupTitle}>
-              Leve 1.500+ livros por R$ 24,90
+              1.500+ livros digitais
             </h2>
-            <p style={S.popupSub}>de R$ 129,90 · acesso vitalício · pagamento único</p>
+            <div style={S.popupPriceRow}>
+              <span style={S.popupOldPrice}>R$ 89,90</span>
+              <span style={S.popupNewPrice}>R$ 24,90</span>
+            </div>
+            <p style={S.popupSub}>pagamento único · acesso vitalício</p>
             <button
               type="button"
               style={S.popupCta}
@@ -324,10 +328,10 @@ export function LandingClient() {
                 void proceedToCheckout("popup-70");
               }}
             >
-              QUERO MEU ACESSO AGORA →
+              GARANTIR MINHA OFERTA →
             </button>
             <button type="button" style={S.popupDismiss} onClick={() => setShowPopup(false)}>
-              Agora não
+              Não quero o desconto
             </button>
           </div>
         </div>
@@ -395,15 +399,47 @@ const S: Record<string, React.CSSProperties> = {
     lineHeight: 1,
     cursor: "pointer",
   },
-  popupEmoji: { fontSize: 36, marginBottom: 8 },
+  popupBadge: {
+    display: "inline-block",
+    background: "#1A1A1A",
+    color: "#FFD54F",
+    fontFamily: "Poppins, sans-serif",
+    fontWeight: 800,
+    fontSize: 11,
+    letterSpacing: ".06em",
+    padding: "7px 14px",
+    borderRadius: 999,
+    marginBottom: 16,
+  },
   popupTitle: {
     fontFamily: "Poppins, sans-serif",
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 800,
     lineHeight: 1.2,
     color: "#1A1A1A",
-    margin: "0 0 8px",
+    margin: "0 0 10px",
     letterSpacing: "-.02em",
+  },
+  popupPriceRow: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "center",
+    gap: 12,
+    margin: "0 0 6px",
+  },
+  popupOldPrice: {
+    fontFamily: "Poppins, sans-serif",
+    fontSize: 20,
+    fontWeight: 600,
+    color: "#9ca3af",
+    textDecoration: "line-through",
+  },
+  popupNewPrice: {
+    fontFamily: "Poppins, sans-serif",
+    fontSize: 40,
+    fontWeight: 800,
+    color: "#1A1A1A",
+    lineHeight: 1,
   },
   popupSub: { fontSize: 13, color: "#6b7280", margin: "0 0 20px" },
   popupCta: {
