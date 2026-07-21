@@ -146,6 +146,9 @@ function setupCarousels(root: HTMLElement): () => void {
 export function LandingClient() {
   const ref = useRef<HTMLDivElement>(null);
   const [redirecting, setRedirecting] = useState(false);
+  // Pop-up de intenção: aparece uma vez quando o visitante rola ~70% da página
+  // (sinal de interesse), com uma chamada curta e acesso direto ao checkout.
+  const [showPopup, setShowPopup] = useState(false);
   // Guarda síncrono contra clique duplo (o estado do React pode estar "atrasado").
   const redirectingRef = useRef(false);
   // Sessão de checkout iniciada já no toque/mouse-down do CTA (antes do clique),
@@ -247,11 +250,34 @@ export function LandingClient() {
     root.addEventListener("pointerdown", handlePointerDown);
     root.addEventListener("click", handleClick);
 
+    // Pop-up ao atingir ~70% de rolagem — uma vez por sessão de navegação.
+    const POPUP_KEY = "dbk_popup70";
+    function onScroll() {
+      if (sessionStorage.getItem(POPUP_KEY)) {
+        window.removeEventListener("scroll", onScroll);
+        return;
+      }
+      const doc = document.documentElement;
+      const scrollable = doc.scrollHeight - window.innerHeight;
+      const pct = scrollable > 0 ? (window.scrollY / scrollable) * 100 : 0;
+      if (pct >= 70) {
+        sessionStorage.setItem(POPUP_KEY, "1");
+        setShowPopup(true);
+        // Pré-cria a sessão do Stripe para o CTA do pop-up redirecionar rápido.
+        if (!process.env.NEXT_PUBLIC_CHECKOUT_URL) {
+          prefetchRef.current = { ctaId: "popup-70", promise: requestCheckoutUrl("popup-70") };
+        }
+        window.removeEventListener("scroll", onScroll);
+      }
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+
     const carouselCleanup = setupCarousels(root);
 
     return () => {
       root.removeEventListener("pointerdown", handlePointerDown);
       root.removeEventListener("click", handleClick);
+      window.removeEventListener("scroll", onScroll);
       carouselCleanup();
     };
   }, []);
@@ -266,6 +292,46 @@ export function LandingClient() {
     <div ref={ref}>
       <div className="dc-mobile" dangerouslySetInnerHTML={{ __html: LANDING_HTML }} />
       <div className="dc-desktop" dangerouslySetInnerHTML={{ __html: LANDING_HTML_DESKTOP }} />
+
+      {/* Pop-up de intenção (70% de rolagem) — frase curta + acesso direto ao checkout. */}
+      {showPopup && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="popup-title"
+          style={S.popupOverlay}
+          onClick={() => setShowPopup(false)}
+        >
+          <div style={S.popupCard} onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              aria-label="Fechar"
+              style={S.popupClose}
+              onClick={() => setShowPopup(false)}
+            >
+              ×
+            </button>
+            <div style={S.popupEmoji}>📚</div>
+            <h2 id="popup-title" style={S.popupTitle}>
+              Leve 1.500+ livros por R$ 24,90
+            </h2>
+            <p style={S.popupSub}>de R$ 129,90 · acesso vitalício · pagamento único</p>
+            <button
+              type="button"
+              style={S.popupCta}
+              onClick={() => {
+                setShowPopup(false);
+                void proceedToCheckout("popup-70");
+              }}
+            >
+              QUERO MEU ACESSO AGORA →
+            </button>
+            <button type="button" style={S.popupDismiss} onClick={() => setShowPopup(false)}>
+              Agora não
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Spinner leve enquanto a sessão do Stripe é criada e o redirect acontece. */}
       {redirecting && (
@@ -295,5 +361,73 @@ const S: Record<string, React.CSSProperties> = {
     border: "4px solid #FFE9A6",
     borderTopColor: "#FFC107",
     animation: "dbk-spin .8s linear infinite",
+  },
+  popupOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    zIndex: 1100,
+  },
+  popupCard: {
+    position: "relative",
+    width: "100%",
+    maxWidth: 360,
+    background: "#fff",
+    borderRadius: 20,
+    padding: "30px 24px 22px",
+    textAlign: "center",
+    boxShadow: "0 30px 70px -25px rgba(0,0,0,.55)",
+  },
+  popupClose: {
+    position: "absolute",
+    top: 10,
+    right: 12,
+    width: 30,
+    height: 30,
+    border: "none",
+    background: "transparent",
+    color: "#9ca3af",
+    fontSize: 24,
+    lineHeight: 1,
+    cursor: "pointer",
+  },
+  popupEmoji: { fontSize: 36, marginBottom: 8 },
+  popupTitle: {
+    fontFamily: "Poppins, sans-serif",
+    fontSize: 22,
+    fontWeight: 800,
+    lineHeight: 1.2,
+    color: "#1A1A1A",
+    margin: "0 0 8px",
+    letterSpacing: "-.02em",
+  },
+  popupSub: { fontSize: 13, color: "#6b7280", margin: "0 0 20px" },
+  popupCta: {
+    display: "block",
+    width: "100%",
+    background: "#FFC107",
+    color: "#1A1A1A",
+    fontFamily: "Poppins, sans-serif",
+    fontWeight: 800,
+    fontSize: 16,
+    border: "none",
+    borderRadius: 12,
+    padding: "16px",
+    cursor: "pointer",
+    boxShadow: "0 12px 26px -12px rgba(255,193,7,.9)",
+  },
+  popupDismiss: {
+    display: "block",
+    width: "100%",
+    background: "transparent",
+    color: "#9ca3af",
+    fontSize: 13,
+    border: "none",
+    padding: "12px 0 2px",
+    cursor: "pointer",
   },
 };
